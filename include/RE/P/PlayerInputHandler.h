@@ -7,7 +7,9 @@ namespace RE
 {
 	class ButtonEvent;
 	class InputEvent;
+	class MotionGestureEvent;
 	class MouseMoveEvent;
+	class SixaxisEvent;
 	class PlayerControlsData;
 	class ThumbstickEvent;
 
@@ -31,6 +33,20 @@ namespace RE
 		void ProcessThumbstick(ThumbstickEvent* a_event, PlayerControlsData* a_data) { REL::RelocateVirtual<void(PlayerInputHandler*, ThumbstickEvent*, PlayerControlsData*)>(Slot(0x02), 0x02, this, a_event, a_data); }
 		void ProcessMouseMove(MouseMoveEvent* a_event, PlayerControlsData* a_data) { REL::RelocateVirtual<void(PlayerInputHandler*, MouseMoveEvent*, PlayerControlsData*)>(Slot(0x03), 0x03, this, a_event, a_data); }
 		void ProcessButton(ButtonEvent* a_event, PlayerControlsData* a_data) { REL::RelocateVirtual<void(PlayerInputHandler*, ButtonEvent*, PlayerControlsData*)>(Slot(0x04), 0x04, this, a_event, a_data); }
+
+		// The slots 1.7.99 inserts (02, 03). They do nothing below 1.7.99.
+		void ProcessMotionGesture(MotionGestureEvent* a_event, PlayerControlsData* a_data)
+		{
+			if (REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99)) {
+				REL::RelocateVirtual<void(PlayerInputHandler*, MotionGestureEvent*, PlayerControlsData*)>(0x02, 0x02, this, a_event, a_data);
+			}
+		}
+		void ProcessSixaxis(SixaxisEvent* a_event, PlayerControlsData* a_data)
+		{
+			if (REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99)) {
+				REL::RelocateVirtual<void(PlayerInputHandler*, SixaxisEvent*, PlayerControlsData*)>(0x03, 0x03, this, a_event, a_data);
+			}
+		}
 
 		[[nodiscard]] static std::ptrdiff_t Slot(std::ptrdiff_t a_index) noexcept
 		{

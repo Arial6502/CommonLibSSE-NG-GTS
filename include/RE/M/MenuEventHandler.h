@@ -9,7 +9,9 @@ namespace RE
 	class ButtonEvent;
 	class InputEvent;
 	class KinectEvent;
+	class MotionGestureEvent;
 	class MouseMoveEvent;
+	class SixaxisEvent;
 	class ThumbstickEvent;
 
 	class MenuEventHandler : public BSIntrusiveRefCounted
@@ -36,6 +38,16 @@ namespace RE
 		bool ProcessThumbstick(ThumbstickEvent* a_event) { return REL::RelocateVirtual<bool(MenuEventHandler*, ThumbstickEvent*)>(Slot(0x03), 0x03, this, a_event); }
 		bool ProcessMouseMove(MouseMoveEvent* a_event) { return REL::RelocateVirtual<bool(MenuEventHandler*, MouseMoveEvent*)>(Slot(0x04), 0x04, this, a_event); }
 		bool ProcessButton(ButtonEvent* a_event) { return REL::RelocateVirtual<bool(MenuEventHandler*, ButtonEvent*)>(Slot(0x05), 0x05, this, a_event); }
+
+		// The slots 1.7.99 inserts (02, 03). They do nothing and return false below 1.7.99.
+		bool ProcessMotionGesture(MotionGestureEvent* a_event)
+		{
+			return REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99) && REL::RelocateVirtual<bool(MenuEventHandler*, MotionGestureEvent*)>(0x02, 0x02, this, a_event);
+		}
+		bool ProcessSixaxis(SixaxisEvent* a_event)
+		{
+			return REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99) && REL::RelocateVirtual<bool(MenuEventHandler*, SixaxisEvent*)>(0x03, 0x03, this, a_event);
+		}
 
 		[[nodiscard]] static std::ptrdiff_t Slot(std::ptrdiff_t a_index) noexcept
 		{

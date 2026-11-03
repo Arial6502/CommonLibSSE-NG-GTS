@@ -12,12 +12,19 @@ namespace RE
 		kChar,
 		kThumbstick,
 		kDeviceConnect,
-		kKinect
+		kKinect,
+		// 1.7.99 only.
+		kSixaxis,
+		kMotionGesture,
+		kAmiibo
 	};
 
+	class AmiiboEvent;
 	class ButtonEvent;
 	class IDEvent;
+	class MotionGestureEvent;
 	class MouseMoveEvent;
+	class SixaxisEvent;
 	class ThumbstickEvent;
 
 	class InputEvent
@@ -44,6 +51,18 @@ namespace RE
 
 		[[nodiscard]] ThumbstickEvent* AsThumbstickEvent();
 		[[nodiscard]] const ThumbstickEvent* AsThumbstickEvent() const;
+
+#ifdef ENABLE_SKYRIM_AE
+		// 1.7.99 only. Null on older runtimes.
+		[[nodiscard]] AmiiboEvent*       AsAmiiboEvent();
+		[[nodiscard]] const AmiiboEvent* AsAmiiboEvent() const;
+
+		[[nodiscard]] MotionGestureEvent*       AsMotionGestureEvent();
+		[[nodiscard]] const MotionGestureEvent* AsMotionGestureEvent() const;
+
+		[[nodiscard]] SixaxisEvent*       AsSixaxisEvent();
+		[[nodiscard]] const SixaxisEvent* AsSixaxisEvent() const;
+#endif
 
 		// members
 		stl::enumeration<INPUT_DEVICE, std::uint32_t>     device;     // 08
