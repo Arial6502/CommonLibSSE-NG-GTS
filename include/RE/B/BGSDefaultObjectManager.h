@@ -1013,17 +1013,24 @@ namespace RE
 			return func();
 		}
 
-		[[nodiscard]] TESForm* GetObject(DefaultObject a_object) const noexcept { return GetObject(stl::to_underlying(a_object)); }
+		// Routed through the DefaultObjectID path so the 1.7.99 index remap applies.
+		[[nodiscard]] TESForm* GetObject(DefaultObject a_object) const noexcept
+		{
+			const auto obj = const_cast<BGSDefaultObjectManager*>(this)->GetObject(static_cast<DefaultObjectID>(stl::to_underlying(a_object)));
+			return obj ? *obj : nullptr;
+		}
 
 		template <class T>
 		[[nodiscard]] T* GetObject(DefaultObject a_object) const noexcept
 		{
-			return GetObject<T>(stl::to_underlying(a_object));
+			const auto obj = GetObject(a_object);
+			return obj ? obj->As<T>() : nullptr;
 		}
 
+		// a_idx is the running runtime's own index, with no remap.
 		[[nodiscard]] TESForm* GetObject(std::size_t a_idx) const noexcept
 		{
-			assert(a_idx < stl::to_underlying(DefaultObject::kTotal));
+			assert(a_idx < ObjectCount());
 			return IsObjectInitialized(a_idx) ? objects[a_idx] : nullptr;
 		}
 
@@ -1045,15 +1052,16 @@ namespace RE
 
 		[[nodiscard]] bool IsObjectInitialized(DEFAULT_OBJECT a_object) const noexcept
 		{
-			return IsObjectInitialized(stl::to_underlying(a_object));
+			return IsObjectInitialized(static_cast<DefaultObjectID>(stl::to_underlying(a_object)));
 		}
 
 		[[nodiscard]] bool IsObjectInitialized(DefaultObjectID a_object) const noexcept;
 
-		[[nodiscard]] bool IsObjectInitialized(std::size_t a_idx) const noexcept
-		{
-			return (&REL::RelocateMember<bool>(this, 0xB80, 0xBA8))[a_idx];
-		}
+		// a_idx is the running runtime's own index, with no remap.
+		[[nodiscard]] bool IsObjectInitialized(std::size_t a_idx) const noexcept;
+
+		// The number of default objects the running runtime holds.
+		[[nodiscard]] static std::size_t ObjectCount() noexcept;
 
 		[[nodiscard]] static bool SupportsVR(DefaultObjectID a_object) noexcept;
 
@@ -1068,9 +1076,12 @@ namespace RE
 
 		// members
 		TESForm* objects[DEFAULT_OBJECTS::kTotal];  // 020 - DNAM
+
+	private:
+		// The initialized flags follow the form array, whose length differs per runtime
+		// (SE 364, AE 366, AE 1.7.99 372, VR 369). Use IsObjectInitialized().
 #ifndef SKYRIM_CROSS_VR
-		bool          objectInit[DEFAULT_OBJECTS::kTotal];  // B80
-		std::uint32_t padCEC;                               // CEC
+		std::uint8_t _padObjectInit[0xCF0 - 0xB80];  // B80
 #else
 		std::uint8_t unk5D8[0x718];  // 5D8
 #endif

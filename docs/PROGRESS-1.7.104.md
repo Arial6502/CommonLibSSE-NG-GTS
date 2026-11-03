@@ -30,6 +30,8 @@ untested.
 | D5 | Ids that change in 1.7 use GG's `AE_CHECK(version, older, newer)`. | 1.7.104 gave some functions new ids (see F2). It is the same idiom GG already uses for 1.6.1130 id changes. |
 | D6 | One local commit per verified unit. No push. | User choice. |
 | D8 | `SkyrimSE.pdb` from the Crash Logger mod (`E:\Mods\ModOrganizer Skyrim AE\Data\Mods\Crash Logger\SKSE\Plugins`) is a 1.6.1170 PDB exported from Ghidra out of community RE work. It is a second opinion on member offsets, not ground truth. When it disagrees with this library, the binary decides. | About 32k struct records with member offsets. Nothing else gives per-member data at that scale. |
+| D9 | Member moves are detected from `[this + disp]` accesses, not decompiled types. A callee-saved register that copies RCX in the prologue counts as `this` for the whole function. | Fast enough for every class in all three binaries. The code is the same in each version, so noise it lets in cannot fake a move; only real offset changes differ. |
+| D10 | Per class, the harness covers vtable slot functions and every function the AE Ghidra databases name `Class::...`, plus the library's own ids for the class. AE ids are shared by 1.6.1170 and 1.7.104. SE pairs through the crosswalk. | Covers classes without a vtable (ControlMap) and regions vfuncs never touch (TES). |
 | D7 | GTSPlugin is never edited. Its build is meant to break where D1 hides members. | User choice. GTSPlugin has its own RelocationIDEx helpers for per-version ids and offsets. |
 
 ## Verification levers
@@ -58,12 +60,23 @@ All are committed scripts, so every result can be rerun.
 - [x] P2. Fix the ids from F1, F2 and F7.
 - [ ] P3. Layout harness. Library dump, RTTI bases, vtable diff, sizes, shift detector, diff report.
   - [x] Fact extractor and differ, validated on PlayerCharacter, SkyrimVM, Actor.
-  - [ ] Full fact runs: SE 1.5.97, AE 1.6.1170, AE 1.7.104 (7729 classes each).
-  - [ ] Library layout dumps (SE-only, AE-only).
+  - [x] Tracker fixed twice: vtable end detection (stop only at non-executable targets), and `this` held in callee-saved registers.
+  - [x] Class list grows to 9645 classes (7999 with named functions) from Offsets_VTABLE.h, Offsets.h, class sources and Ghidra names.
+  - [ ] Full fact runs: SE 1.5.97, AE 1.6.1170, AE 1.7.104.
+  - [x] Library layout dumps (SE-only, AE-only, flatrim). 3965 RE classes each.
   - [ ] Attribute each detected move to the most-base class that shows it, so derived classes don't repeat it.
   - [ ] Review list: per class, binary moves vs what the library models. Every class lands in fixed, already-correct, or unverifiable.
   - [ ] Object sizes per binary (allocation sites).
-- [ ] P4. 1.6.1170 parity. Port GG's 1.6.1130 changes and verify each one in Ghidra: ControlMap, Renderer, BGSSaveLoadManager, TES, TESContainer, BSSystemUtility, BSWin32SystemUtility, BGSDefaultObjectManager count (366 on AE, not 364), Console / BSScaleformTranslator / Script ids.
+- [ ] P4. 1.6.1170 parity. Port GG's 1.6.1130 changes and verify each one in Ghidra.
+  - [x] ControlMap (F10)
+  - [x] BGSSaveLoadManager (F11)
+  - [x] TESContainer: only fills padding at 0x14, nothing moves. skip.
+  - [x] Script id (F1)
+  - [x] TES (F14)
+  - [ ] Renderer
+  - [ ] BSSystemUtility, BSWin32SystemUtility
+  - [x] BGSDefaultObjectManager count and 1.7 remap (F12, F13)
+  - [ ] Console / BSScaleformTranslator ids
 - [ ] P4. Fix every 1.6.1170 mismatch the layout harness reports.
 - [ ] P5. 1.7.104. Port and verify GG's changes: SkyrimVM (+0x10 at 0x180), PlayerCharacter (+8 at 0x2D8), MenuEventHandler / PlayerInputHandler (+2 slots), HeldStateHandler, BSInputEventQueue, AttackBlockHandler, LookHandler, LockpickingMenu, BookMenu, bhkWorld, TESTopicInfo, BSSystemUtility (+1 slot), BSSaveDataSystemUtility (+6 slots), BGSDefaultObjectManager remap, new input event classes.
 - [ ] P5. Fix every 1.7.104 mismatch the layout harness reports beyond GG's list.
@@ -85,3 +98,6 @@ All are committed scripts, so every result can be rerun.
 | F9 | `Logger` uses AE 380738 only below 1.6.1130. The log folder name id changed in 1130, so the gate is intentional. | User | OK |
 | F10 | ControlMap: from 1.6.1130 a new input context grows `controlMap[]` by one, so every field from `linkedMappings` on is +8. The library had them as plain members at SE offsets. | `disps_by_id.py` on 11 ControlMap functions (GG ids): e.g. ToggleControls touches 0x118/0x11C on SE and 0x120/0x124 on 1170 and 1.7.104. | fixed: `RUNTIME_DATA` behind `GetRuntimeData()`, pad in the flatrim layout |
 | F11 | BGSSaveLoadManager: from 1.6.1130, 0x48 bytes are inserted at 0x2B0. The save thread (`unk2B0`) and request queue (`unk370`) move to 0x2F8 / 0x3B8. Members up to 0x2A8 do not move. | `Save_Impl` reads the thread at 0x2B0 on SE and 0x2F8 on 1170 and 1.7.104. GenerateCharacterID, PopulateSaveList and LoadMostRecentSaveGame touch the same offsets on all three. | fixed: `RUNTIME_DATA` behind `GetRuntimeData()` |
+| F12 | BGSDefaultObjectManager: the initialized flags follow the form array, which holds 364 objects on SE, 366 on 1.6.1170 and 372 on 1.7.104, so the flags sit at 0xB80 / 0xB90 / 0xBC0. The library read 0xB80 on every runtime, so `IsObjectInitialized` and `GetObject` were wrong on 1.6.1170 already. 1.7.99 also inserts objects at 188 and 264-268, which renumbers later indices. | `InitializeAfterAllFormsRead` touches 0xB80 / 0xB90 / 0xBC0. 39 code references into `gBGSDefaultObjectManager.objects[]`, paired by function id 1170 vs 1.7.104: indices to 185 unchanged, 188-216 +1, 278-348 +6. The library enum puts the inserts after `kHelpManualXBox` (187) and `kHelpAttackTarget` (262), which fixes the +6 boundary at 263. | fixed: `ObjectCount()`, flags at `0x20 + count * 8`, 1.7 remap in `MapIndex`, `objectInit[]` hidden |
+| F13 | `BGSDefaultObjectManager::GetObject(DefaultObjectID)` returned `&RelocateMember<TESForm**>(this, 0x20, 0x20)[idx]`, which reads `objects[0]` as a pointer and indexes off it. Wrong on every runtime. | Code reading | fixed: `&objects[idx]` |
+| F14 | TES from 1.6.1130: the SE `showLANDborders` byte at 0x129 became a dword at 0x12C with a new dword after it, the bytes 0x12A-0x133 moved +0xA, the floats at 0x134/0x138 (declared u32/u64) moved +0xC, and everything from `worldSpace` (0x140) moved +8. GG's AE model keeps 0x134-0x13C in place and is wrong there. Members 0x70-0x120 do not move. | Disassembly of 4 paired functions (SE 13171/13148/13276/13140 vs AE 13316/13288/13427/13280): byte compares 0x12D/0x12E/0x132 -> 0x137/0x138/0x13C, MOVSS/COMISS 0x134/0x138 -> 0x140/0x144, MOVZX byte 0x129 -> MOV dword 0x12C, MOV byte 0x12A -> 0x134. 120 votes for +8 from 0x140. | fixed: `GetRuntimeData()` (SE, <1130), `GetAERuntimeData()` (1130+), `GetRuntimeData2()` (0x140 / 0x148) |
