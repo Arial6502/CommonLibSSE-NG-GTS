@@ -3,6 +3,7 @@
 #include "RE/N/NiPoint3.h"
 #include "RE/P/PlayerInputHandler.h"
 #include "RE/T/TESCameraState.h"
+#include "SKSE/Version.h"
 
 namespace RE
 {
@@ -46,12 +47,50 @@ namespace RE
 		float         unk70;                    // 70
 		float         currentPitchOffset;       // 74 - [-100, 100]
 		float         targetPitchOffset;        // 78 - [-100, 100]
-		float         unk7C;                    // 7C
-		std::uint32_t unk80;                    // 80
-		bool          cameraOverride;           // 84
-		bool          cameraPitchOverride;      // 85
-		std::uint16_t unk86;                    // 86
-		std::uint64_t unk88;                    // 88
+
+		// SE and 1.6. Starts at 0x7C.
+		struct RUNTIME_DATA
+		{
+			float         unk7C;                // 00 (7C)
+			std::uint32_t unk80;                // 04 (80)
+			bool          cameraOverride;       // 08 (84)
+			bool          cameraPitchOverride;  // 09 (85)
+			std::uint8_t  unk86;                // 0A (86)
+			std::uint8_t  unk87;                // 0B (87)
+			std::uint32_t unk88;                // 0C (88)
+			std::uint32_t unk8C;                // 10 (8C)
+		};
+		static_assert(sizeof(RUNTIME_DATA) == 0x14);
+
+		// 1.7.99 and later: a dword is inserted at 0x7C and the rest moves +4. Starts at 0x7C.
+		struct AE1799_RUNTIME_DATA
+		{
+			std::uint32_t unk7C;                // 00 (7C) - new
+			float         unk80;                // 04 (80) - unk7C
+			std::uint32_t unk84;                // 08 (84) - unk80
+			bool          cameraOverride;       // 0C (88)
+			bool          cameraPitchOverride;  // 0D (89)
+			std::uint8_t  unk8A;                // 0E (8A) - unk86
+			std::uint8_t  unk8B;                // 0F (8B) - unk87
+			std::uint32_t unk8C;                // 10 (8C) - unk88
+			std::uint32_t unk90;                // 14 (90) - unk8C
+		};
+		static_assert(sizeof(AE1799_RUNTIME_DATA) == 0x18);
+
+		// Null from 1.7.99 on, use GetAE1799RuntimeData() there.
+		[[nodiscard]] RUNTIME_DATA* GetRuntimeData() noexcept
+		{
+			return REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99) ? nullptr : &REL::RelocateMember<RUNTIME_DATA>(this, 0x7C);
+		}
+
+		// Null below 1.7.99, use GetRuntimeData() there.
+		[[nodiscard]] AE1799_RUNTIME_DATA* GetAE1799RuntimeData() noexcept
+		{
+			return REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99) ? &REL::RelocateMember<AE1799_RUNTIME_DATA>(this, 0x7C) : nullptr;
+		}
+
+	private:
+		std::uint8_t _padRuntimeData[sizeof(RUNTIME_DATA)];  // 7C - use GetRuntimeData() or GetAE1799RuntimeData()
 	};
 	static_assert(sizeof(FirstPersonState) == 0x90);
 }

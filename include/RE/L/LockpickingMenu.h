@@ -5,6 +5,7 @@
 #include "RE/I/IMenu.h"
 #include "RE/M/MenuEventHandler.h"
 #include "RE/N/NiMatrix3.h"
+#include "SKSE/Version.h"
 
 namespace RE
 {
@@ -62,24 +63,30 @@ namespace RE
 	float                 shivKeyTime;         /* 90 */ \
 	std::uint32_t         unk0DC;              /* 94 */ \
 	float                 currentAngle;        /* 98 */ \
-	float                 lockAngle;           /* 9C */ \
-	std::uint32_t         unk0E8;              /* A0 */ \
-	BSSoundHandle         unk0EC;              /* A4 */ \
-	std::uint32_t         unk0F8;              /* B0 */ \
-	std::uint32_t         unk0FC;              /* B4 */ \
-	std::uint32_t         unk100;              /* B8 */ \
-	std::uint32_t         unk104;              /* BC */ \
-	std::uint16_t         unk108;              /* C0 */ \
-	std::uint8_t          unk10A;              /* C2 */ \
-	std::uint8_t          unk10B;              /* C3 */ \
-	std::uint8_t          unk10C;              /* C4 */ \
-	std::uint8_t          unk10D;              /* C5 */ \
-	std::uint8_t          unk10E;              /* C6 */ \
-	std::uint8_t          pad10F;              /* C7 */
+	float                 lockAngle;           /* 9C */
 
 			RUNTIME_DATA_CONTENT
 		};
-		static_assert(sizeof(RUNTIME_DATA) == 0xC8);
+		static_assert(sizeof(RUNTIME_DATA) == 0xA0);
+
+		// 1.7.99 inserts 0x14 bytes after lockAngle, so this block moves from 0xE8 to 0xFC.
+		struct TAIL_RUNTIME_DATA
+		{
+			std::uint32_t unk0E8;  // 00
+			BSSoundHandle unk0EC;  // 04
+			std::uint32_t unk0F8;  // 10
+			std::uint32_t unk0FC;  // 14
+			std::uint32_t unk100;  // 18
+			std::uint32_t unk104;  // 1C
+			std::uint16_t unk108;  // 20
+			std::uint8_t  unk10A;  // 22
+			std::uint8_t  unk10B;  // 23
+			std::uint8_t  unk10C;  // 24
+			std::uint8_t  unk10D;  // 25
+			std::uint8_t  unk10E;  // 26
+			std::uint8_t  pad10F;  // 27
+		};
+		static_assert(sizeof(TAIL_RUNTIME_DATA) == 0x28);
 
 		~LockpickingMenu() override;  // 00
 
@@ -131,9 +138,25 @@ namespace RE
 			return REL::RelocateMember<RUNTIME_DATA>(this, 0x48, 0x58);
 		}
 
+		[[nodiscard]] inline TAIL_RUNTIME_DATA& GetTailRuntimeData() noexcept
+		{
+			if SKYRIM_REL_VR_CONSTEXPR (REL::Module::IsVR()) {
+				return REL::RelocateMember<TAIL_RUNTIME_DATA>(this, 0xF8);
+			}
+			return REL::RelocateMemberIfNewer<TAIL_RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_7_99, this, 0xE8, 0xFC);
+		}
+
+		[[nodiscard]] inline const TAIL_RUNTIME_DATA& GetTailRuntimeData() const noexcept
+		{
+			return const_cast<LockpickingMenu*>(this)->GetTailRuntimeData();
+		}
+
 		// members
 #ifndef SKYRIM_CROSS_VR
 		RUNTIME_DATA_CONTENT  // 48, 58
+
+	private:
+		std::uint8_t _padTailRuntimeData[sizeof(TAIL_RUNTIME_DATA)];  // E8 - use GetTailRuntimeData()
 #endif
 	};
 #ifndef ENABLE_SKYRIM_VR

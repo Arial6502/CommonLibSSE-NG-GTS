@@ -10,9 +10,16 @@ namespace RE
 	struct BeamProjectileImpactEvent;
 
 	class BeamProjectile :
+#ifndef ENABLE_SKYRIM_AE
 		public Projectile,                                 // 000
 		public BSTEventSource<BeamProjectileImpactEvent>,  // 1E0
 		public BSTEventSink<BSProceduralGeomEvent>         // 1D8
+#else
+		// With AE enabled Projectile hides its runtime data, so bases declared after it
+		// would compile far below their real offsets (SE 1D8 / 1E0, AE 1E0 / 1E8). Reach
+		// them through AsBSProceduralGeomEventSink() and AsBeamProjectileImpactEventSource().
+		public Projectile  // 000
+#endif
 	{
 	public:
 		inline static constexpr auto RTTI = RTTI_BeamProjectile;
@@ -44,8 +51,20 @@ namespace RE
 		bool ShouldUseDesiredTarget() override;               // C1
 #endif
 
+#ifndef ENABLE_SKYRIM_AE
 		// override (BSTEventSink<BSProceduralGeomEvent>)
 		BSEventNotifyControl ProcessEvent(const BSProceduralGeomEvent* a_event, BSTEventSource<BSProceduralGeomEvent>* a_eventSource) override;  // 01
+#endif
+
+		[[nodiscard]] inline BSTEventSink<BSProceduralGeomEvent>* AsBSProceduralGeomEventSink() noexcept
+		{
+			return &REL::RelocateMemberIfNewer<BSTEventSink<BSProceduralGeomEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x1D8, 0x1E0);
+		}
+
+		[[nodiscard]] inline BSTEventSource<BeamProjectileImpactEvent>* AsBeamProjectileImpactEventSource() noexcept
+		{
+			return &REL::RelocateMemberIfNewer<BSTEventSource<BeamProjectileImpactEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x1E0, 0x1E8);
+		}
 
 		struct BEAM_RUNTIME_DATA
 		{
@@ -55,12 +74,12 @@ namespace RE
 
 		[[nodiscard]] inline BEAM_RUNTIME_DATA& GetBeamRuntimeData() noexcept
 		{
-			return REL::RelocateMemberIfNewer<BEAM_RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_6_629, this, 0x98, 0xA0);
+			return REL::RelocateMemberIfNewer<BEAM_RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_6_629, this, 0x238, 0x240);
 		}
 
 		[[nodiscard]] inline const BEAM_RUNTIME_DATA& GetBeamRuntimeData() const noexcept
 		{
-			return REL::RelocateMemberIfNewer<BEAM_RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_6_629, this, 0x98, 0xA0);
+			return REL::RelocateMemberIfNewer<BEAM_RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_6_629, this, 0x238, 0x240);
 		}
 
 		// members
