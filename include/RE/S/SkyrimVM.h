@@ -19,6 +19,7 @@
 #include "RE/S/SimpleAllocMemoryPagePolicy.h"
 #include "RE/S/SkyrimScriptObjectBindPolicy.h"
 #include "RE/S/SkyrimScriptStore.h"
+#include "SKSE/Version.h"
 
 namespace RE
 {
@@ -35,6 +36,8 @@ namespace RE
 	struct TESActivateEvent;
 	struct TESActiveEffectApplyRemoveEvent;
 	struct TESActorLocationChangeEvent;
+	struct TESAmiiboForcedStopDetectionEvent;
+	struct TESAmiiboTouchEvent;
 	struct TESBookReadEvent;
 	struct TESCellAttachDetachEvent;
 	struct TESCellFullyLoadedEvent;
@@ -82,7 +85,6 @@ namespace RE
 	struct TESUniqueIDChangeEvent;
 
 	class SkyrimVM :
-		public BSTSingletonSDM<SkyrimVM>,                      // 01A0
 		public BSScript::IFreezeQuery,                         // 0000
 		public BSScript::IStackCallbackSaveInterface,          // 0008
 		public BSTEventSink<TESActivateEvent>,                 // 0010
@@ -130,12 +132,16 @@ namespace RE
 		public BSTEventSink<TESTriggerEnterEvent>,             // 0160
 		public BSTEventSink<TESTriggerLeaveEvent>,             // 0168
 		public BSTEventSink<TESUniqueIDChangeEvent>,           // 0170
-		public BSTEventSink<TESSwitchRaceCompleteEvent>,       // 0178
-		public BSTEventSink<TESPlayerBowShotEvent>,            // 0180
-		public BSTEventSink<TESFastTravelEndEvent>,            // 0188
-		public BSTEventSink<PositionPlayerEvent>,              // 0190
-		public BSTEventSink<BSScript::StatsEvent>,             // 0198
-		public BSTEventSource<BSScript::StatsEvent>            // 01A8
+		public BSTEventSink<TESSwitchRaceCompleteEvent>        // 0178
+	// 1.7.99 inserts BSTEventSink<TESAmiiboTouchEvent> and BSTEventSink<TESAmiiboForcedStopDetectionEvent>
+	// at 0x180, so the bases below and every member move +0x10. They are not declared as bases, since
+	// a compile time upcast would be wrong there. Reach them through the As*() accessors:
+	//   BSTEventSink<TESPlayerBowShotEvent>    0180
+	//   BSTEventSink<TESFastTravelEndEvent>    0188
+	//   BSTEventSink<PositionPlayerEvent>      0190
+	//   BSTEventSink<BSScript::StatsEvent>     0198
+	//   BSTSingletonSDM<SkyrimVM>              01A0 (empty)
+	//   BSTEventSource<BSScript::StatsEvent>   01A8
 	{
 	public:
 		inline static constexpr auto RTTI = RTTI_SkyrimVM;
@@ -215,65 +221,108 @@ namespace RE
 		void RelayEvent(VMHandle handle, BSFixedString* event, BSScript::IFunctionArguments* args, ISendEventFilter* optionalFilter);
 		void SendAndRelayEvent(VMHandle handle, BSFixedString* event, BSScript::IFunctionArguments* args, ISendEventFilter* optionalFilter);
 
-		// members
-		BSTSmartPointer<BSScript::IVirtualMachine>                            impl;                         // 0200
-		BSScript::IVMSaveLoadInterface*                                       saveLoadInterface;            // 0208
-		BSScript::IVMDebugInterface*                                          debugInterface;               // 0210
-		BSScript::SimpleAllocMemoryPagePolicy                                 memoryPagePolicy;             // 0218
-		BSScript::CompiledScriptLoader                                        scriptLoader;                 // 0240
-		SkyrimScript::Logger                                                  logger;                       // 0278
-		SkyrimScript::HandlePolicy                                            handlePolicy;                 // 0328
-		SkyrimScript::ObjectBindPolicy                                        objectBindPolicy;             // 0398
-		BSTSmartPointer<SkyrimScript::Store>                                  scriptStore;                  // 0470
-		SkyrimScript::FragmentSystem                                          fragmentSystem;               // 0478
-		SkyrimScript::Profiler                                                profiler;                     // 0590
-		SkyrimScript::SavePatcher                                             savePatcher;                  // 0670
-		mutable BSSpinLock                                                    frozenLock;                   // 0678
-		std::uint32_t                                                         isFrozen;                     // 0680
-		mutable BSSpinLock                                                    currentVMTimeLock;            // 0684
-		std::uint32_t                                                         currentVMTime;                // 068C
-		std::uint32_t                                                         currentVMMenuModeTime;        // 0690
-		std::uint32_t                                                         currentVMGameTime;            // 0694
-		std::uint32_t                                                         currentVMDaysPassed;          // 0698 - Calender.GetDaysPassed() * 1000
-		mutable BSSpinLock                                                    queuedWaitEventLock;          // 069C
-		std::uint32_t                                                         pad06A4;                      // 06A4
-		BSTArray<WaitCall>                                                    queuedWaitCalls;              // 06A8 - Utility.Wait() calls
-		BSTArray<WaitCall>                                                    queuedWaitMenuModeCalls;      // 06C0 - Utility.WaitMenuMode() calls
-		BSTArray<WaitCall>                                                    queuedWaitGameCalls;          // 06D8 - Utility.WaitGameTime() calls
-		mutable BSSpinLock                                                    queuedLOSEventCheckLock;      // 06F0
-		BSTArray<BSTSmartPointer<LOSDataEvent>>                               queuedLOSEventChecks;         // 06F8 - OnGainLOS/OnLostLOS
-		std::uint32_t                                                         currentLOSEventCheckIndex;    // 0710
-		mutable BSSpinLock                                                    queuedOnUpdateEventLock;      // 0714
-		std::uint32_t                                                         pad071C;                      // 071C
-		BSTArray<BSTSmartPointer<UpdateDataEvent>>                            queuedOnUpdateEvents;         // 0720
-		BSTArray<BSTSmartPointer<UpdateDataEvent>>                            queuedOnUpdateGameEvents;     // 0738
-		std::uint32_t                                                         unk0750;                      // 0750
-		mutable BSSpinLock                                                    registeredSleepEventsLock;    // 0754
-		std::uint32_t                                                         pad075C;                      // 075C
-		BSTSet<VMHandle>                                                      registeredSleepEvents;        // 0760 - RegisterForSleep
-		mutable BSSpinLock                                                    registeredStatsEventsLock;    // 0790
-		BSTSet<VMHandle>                                                      registeredStatsEvents;        // 0798 - RegisterForTrackedStats
-		BSTStaticFreeList<BSTSmartPointer<SkyrimScript::DelayFunctor>, 512>   renderSafeFunctorPool1;       // 07C8
-		BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>  renderSafeFunctorQueue1;      // 27E0
-		BSTStaticFreeList<BSTSmartPointer<SkyrimScript::DelayFunctor>, 512>   renderSafeFunctorPool2;       // 2808
-		BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>  renderSafeFunctorQueue2;      // 4820
-		BSTStaticFreeList<BSTSmartPointer<SkyrimScript::DelayFunctor>, 512>   postRenderFunctorPool1;       // 4848
-		BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>  postRenderFunctorQueue1;      // 6860
-		BSTStaticFreeList<BSTSmartPointer<SkyrimScript::DelayFunctor>, 512>   postRenderFunctorPool2;       // 6888
-		BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>  postRenderFunctorQueue2;      // 88A0
-		mutable BSSpinLock                                                    renderSafeQueueLock;          // 88C8
-		BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>* renderSafeQueueToReadFrom;    // 88D0
-		BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>* renderSafeQueueToWriteTo;     // 88D8
-		mutable BSSpinLock                                                    postRenderQueueLock;          // 88E0
-		BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>* postRenderQueueToReadFrom;    // 88E8
-		BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>* postRenderQueueToWriteTo;     // 88F0
-		mutable BSSpinLock                                                    userLogMapLock;               // 88F8
-		BSTHashMap<const char*, SkyrimScript::Logger*>                        userLogMap;                   // 8900 - Debug.OpenUserLog()
-		mutable BSSpinLock                                                    currentVMOverstressTimeLock;  // 8930
-		std::uint32_t                                                         currentVMOverstressTime;      // 8938
-		std::uint32_t                                                         lastVMStackDumpTime;          // 893C
-		mutable BSSpinLock                                                    InventoryEventFilterMapLock;  // 8940
-		BSTHashMap<VMHandle, InventoryEventFilterLists*>                      InventoryEventFilterMap;      // 8948 - AddInventoryEventFilter()
+		struct RUNTIME_DATA
+		{
+			~RUNTIME_DATA() = delete;
+
+			BSTSmartPointer<BSScript::IVirtualMachine>                            impl;                         // 0200
+			BSScript::IVMSaveLoadInterface*                                       saveLoadInterface;            // 0208
+			BSScript::IVMDebugInterface*                                          debugInterface;               // 0210
+			BSScript::SimpleAllocMemoryPagePolicy                                 memoryPagePolicy;             // 0218
+			BSScript::CompiledScriptLoader                                        scriptLoader;                 // 0240
+			SkyrimScript::Logger                                                  logger;                       // 0278
+			SkyrimScript::HandlePolicy                                            handlePolicy;                 // 0328
+			SkyrimScript::ObjectBindPolicy                                        objectBindPolicy;             // 0398
+			BSTSmartPointer<SkyrimScript::Store>                                  scriptStore;                  // 0470
+			SkyrimScript::FragmentSystem                                          fragmentSystem;               // 0478
+			SkyrimScript::Profiler                                                profiler;                     // 0590
+			SkyrimScript::SavePatcher                                             savePatcher;                  // 0670
+			mutable BSSpinLock                                                    frozenLock;                   // 0678
+			std::uint32_t                                                         isFrozen;                     // 0680
+			mutable BSSpinLock                                                    currentVMTimeLock;            // 0684
+			std::uint32_t                                                         currentVMTime;                // 068C
+			std::uint32_t                                                         currentVMMenuModeTime;        // 0690
+			std::uint32_t                                                         currentVMGameTime;            // 0694
+			std::uint32_t                                                         currentVMDaysPassed;          // 0698 - Calender.GetDaysPassed() * 1000
+			mutable BSSpinLock                                                    queuedWaitEventLock;          // 069C
+			std::uint32_t                                                         pad06A4;                      // 06A4
+			BSTArray<WaitCall>                                                    queuedWaitCalls;              // 06A8 - Utility.Wait() calls
+			BSTArray<WaitCall>                                                    queuedWaitMenuModeCalls;      // 06C0 - Utility.WaitMenuMode() calls
+			BSTArray<WaitCall>                                                    queuedWaitGameCalls;          // 06D8 - Utility.WaitGameTime() calls
+			mutable BSSpinLock                                                    queuedLOSEventCheckLock;      // 06F0
+			BSTArray<BSTSmartPointer<LOSDataEvent>>                               queuedLOSEventChecks;         // 06F8 - OnGainLOS/OnLostLOS
+			std::uint32_t                                                         currentLOSEventCheckIndex;    // 0710
+			mutable BSSpinLock                                                    queuedOnUpdateEventLock;      // 0714
+			std::uint32_t                                                         pad071C;                      // 071C
+			BSTArray<BSTSmartPointer<UpdateDataEvent>>                            queuedOnUpdateEvents;         // 0720
+			BSTArray<BSTSmartPointer<UpdateDataEvent>>                            queuedOnUpdateGameEvents;     // 0738
+			std::uint32_t                                                         unk0750;                      // 0750
+			mutable BSSpinLock                                                    registeredSleepEventsLock;    // 0754
+			std::uint32_t                                                         pad075C;                      // 075C
+			BSTSet<VMHandle>                                                      registeredSleepEvents;        // 0760 - RegisterForSleep
+			mutable BSSpinLock                                                    registeredStatsEventsLock;    // 0790
+			BSTSet<VMHandle>                                                      registeredStatsEvents;        // 0798 - RegisterForTrackedStats
+			BSTStaticFreeList<BSTSmartPointer<SkyrimScript::DelayFunctor>, 512>   renderSafeFunctorPool1;       // 07C8
+			BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>  renderSafeFunctorQueue1;      // 27E0
+			BSTStaticFreeList<BSTSmartPointer<SkyrimScript::DelayFunctor>, 512>   renderSafeFunctorPool2;       // 2808
+			BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>  renderSafeFunctorQueue2;      // 4820
+			BSTStaticFreeList<BSTSmartPointer<SkyrimScript::DelayFunctor>, 512>   postRenderFunctorPool1;       // 4848
+			BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>  postRenderFunctorQueue1;      // 6860
+			BSTStaticFreeList<BSTSmartPointer<SkyrimScript::DelayFunctor>, 512>   postRenderFunctorPool2;       // 6888
+			BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>  postRenderFunctorQueue2;      // 88A0
+			mutable BSSpinLock                                                    renderSafeQueueLock;          // 88C8
+			BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>* renderSafeQueueToReadFrom;    // 88D0
+			BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>* renderSafeQueueToWriteTo;     // 88D8
+			mutable BSSpinLock                                                    postRenderQueueLock;          // 88E0
+			BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>* postRenderQueueToReadFrom;    // 88E8
+			BSTCommonLLMessageQueue<BSTSmartPointer<SkyrimScript::DelayFunctor>>* postRenderQueueToWriteTo;     // 88F0
+			mutable BSSpinLock                                                    userLogMapLock;               // 88F8
+			BSTHashMap<const char*, SkyrimScript::Logger*>                        userLogMap;                   // 8900 - Debug.OpenUserLog()
+			mutable BSSpinLock                                                    currentVMOverstressTimeLock;  // 8930
+			std::uint32_t                                                         currentVMOverstressTime;      // 8938
+			std::uint32_t                                                         lastVMStackDumpTime;          // 893C
+			mutable BSSpinLock                                                    InventoryEventFilterMapLock;  // 8940
+			BSTHashMap<VMHandle, InventoryEventFilterLists*>                      InventoryEventFilterMap;      // 8948 - AddInventoryEventFilter()
+		};
+		static_assert(sizeof(RUNTIME_DATA) == 0x8778);
+
+		// SE and 1.6 offsets. Everything here is +0x10 from 1.7.99.
+		[[nodiscard]] inline RUNTIME_DATA& GetRuntimeData() noexcept
+		{
+			return REL::RelocateMemberIfNewer<RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_7_99, this, 0x200, 0x210);
+		}
+
+		[[nodiscard]] inline const RUNTIME_DATA& GetRuntimeData() const noexcept
+		{
+			return REL::RelocateMemberIfNewer<RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_7_99, this, 0x200, 0x210);
+		}
+
+		[[nodiscard]] BSTEventSink<TESPlayerBowShotEvent>* AsTESPlayerBowShotEventSink() noexcept { return &Shifted<BSTEventSink<TESPlayerBowShotEvent>>(0x180); }
+		[[nodiscard]] BSTEventSink<TESFastTravelEndEvent>* AsTESFastTravelEndEventSink() noexcept { return &Shifted<BSTEventSink<TESFastTravelEndEvent>>(0x188); }
+		[[nodiscard]] BSTEventSink<PositionPlayerEvent>*   AsPositionPlayerEventSink() noexcept { return &Shifted<BSTEventSink<PositionPlayerEvent>>(0x190); }
+		[[nodiscard]] BSTEventSink<BSScript::StatsEvent>*  AsStatsEventSink() noexcept { return &Shifted<BSTEventSink<BSScript::StatsEvent>>(0x198); }
+		[[nodiscard]] BSTEventSource<BSScript::StatsEvent>* AsStatsEventSource() noexcept { return &Shifted<BSTEventSource<BSScript::StatsEvent>>(0x1A8); }
+
+		// The two bases 1.7.99 inserts at 0x180. Null below 1.7.99.
+		[[nodiscard]] BSTEventSink<TESAmiiboTouchEvent>* AsTESAmiiboTouchEventSink() noexcept
+		{
+			return REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99) ? &REL::RelocateMember<BSTEventSink<TESAmiiboTouchEvent>>(this, 0x180) : nullptr;
+		}
+
+		[[nodiscard]] BSTEventSink<TESAmiiboForcedStopDetectionEvent>* AsTESAmiiboForcedStopDetectionEventSink() noexcept
+		{
+			return REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99) ? &REL::RelocateMember<BSTEventSink<TESAmiiboForcedStopDetectionEvent>>(this, 0x188) : nullptr;
+		}
+
+	private:
+		template <class T>
+		[[nodiscard]] T& Shifted(std::ptrdiff_t a_offset) noexcept
+		{
+			return REL::RelocateMemberIfNewer<T>(SKSE::RUNTIME_SSE_1_7_99, this, a_offset, a_offset + 0x10);
+		}
+
+		std::uint8_t _padBases180[0x80];                     // 0180 - use the As*() accessors
+		std::uint8_t _padRuntimeData[sizeof(RUNTIME_DATA)];  // 0200 - use GetRuntimeData()
 	};
 	static_assert(sizeof(SkyrimVM) == 0x8978);
 }

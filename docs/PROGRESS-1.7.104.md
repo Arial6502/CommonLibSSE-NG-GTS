@@ -73,12 +73,13 @@ All are committed scripts, so every result can be rerun.
   - [x] TESContainer: only fills padding at 0x14, nothing moves. skip.
   - [x] Script id (F1)
   - [x] TES (F14)
-  - [ ] Renderer
-  - [ ] BSSystemUtility, BSWin32SystemUtility
+  - [x] Renderer: GTS does not model the render target data (only the older BSRenderManager), nothing to fix. The harness covers BSRenderManager.
+  - [x] BSSystemUtility, BSWin32SystemUtility: not in GTS. skip.
   - [x] BGSDefaultObjectManager count and 1.7 remap (F12, F13)
-  - [ ] Console / BSScaleformTranslator ids
+  - [x] Console / BSScaleformTranslator ids: SelectedRef already uses 504099 (1130+). GTS has no GetCommandScriptParentQuest or translator call.
 - [ ] P4. Fix every 1.6.1170 mismatch the layout harness reports.
-- [ ] P5. 1.7.104. Port and verify GG's changes: SkyrimVM (+0x10 at 0x180), PlayerCharacter (+8 at 0x2D8), MenuEventHandler / PlayerInputHandler (+2 slots), HeldStateHandler, BSInputEventQueue, AttackBlockHandler, LookHandler, LockpickingMenu, BookMenu, bhkWorld, TESTopicInfo, BSSystemUtility (+1 slot), BSSaveDataSystemUtility (+6 slots), BGSDefaultObjectManager remap, new input event classes.
+- [ ] P5. 1.7.104. Port and verify GG's changes. Done so far: SkyrimVM (F15).
+  Remaining: SkyrimVM (+0x10 at 0x180), PlayerCharacter (+8 at 0x2D8), MenuEventHandler / PlayerInputHandler (+2 slots), HeldStateHandler, BSInputEventQueue, AttackBlockHandler, LookHandler, LockpickingMenu, BookMenu, bhkWorld, TESTopicInfo, BSSystemUtility (+1 slot), BSSaveDataSystemUtility (+6 slots), BGSDefaultObjectManager remap, new input event classes.
 - [ ] P5. Fix every 1.7.104 mismatch the layout harness reports beyond GG's list.
 - [ ] P6. Build flatrim. Try a GTSPlugin build against it and list the breaks D1 causes, without editing GTSPlugin (D7).
 - [ ] P7. Final rerun of every lever. Update this file.
@@ -101,3 +102,4 @@ All are committed scripts, so every result can be rerun.
 | F12 | BGSDefaultObjectManager: the initialized flags follow the form array, which holds 364 objects on SE, 366 on 1.6.1170 and 372 on 1.7.104, so the flags sit at 0xB80 / 0xB90 / 0xBC0. The library read 0xB80 on every runtime, so `IsObjectInitialized` and `GetObject` were wrong on 1.6.1170 already. 1.7.99 also inserts objects at 188 and 264-268, which renumbers later indices. | `InitializeAfterAllFormsRead` touches 0xB80 / 0xB90 / 0xBC0. 39 code references into `gBGSDefaultObjectManager.objects[]`, paired by function id 1170 vs 1.7.104: indices to 185 unchanged, 188-216 +1, 278-348 +6. The library enum puts the inserts after `kHelpManualXBox` (187) and `kHelpAttackTarget` (262), which fixes the +6 boundary at 263. | fixed: `ObjectCount()`, flags at `0x20 + count * 8`, 1.7 remap in `MapIndex`, `objectInit[]` hidden |
 | F13 | `BGSDefaultObjectManager::GetObject(DefaultObjectID)` returned `&RelocateMember<TESForm**>(this, 0x20, 0x20)[idx]`, which reads `objects[0]` as a pointer and indexes off it. Wrong on every runtime. | Code reading | fixed: `&objects[idx]` |
 | F14 | TES from 1.6.1130: the SE `showLANDborders` byte at 0x129 became a dword at 0x12C with a new dword after it, the bytes 0x12A-0x133 moved +0xA, the floats at 0x134/0x138 (declared u32/u64) moved +0xC, and everything from `worldSpace` (0x140) moved +8. GG's AE model keeps 0x134-0x13C in place and is wrong there. Members 0x70-0x120 do not move. | Disassembly of 4 paired functions (SE 13171/13148/13276/13140 vs AE 13316/13288/13427/13280): byte compares 0x12D/0x12E/0x132 -> 0x137/0x138/0x13C, MOVSS/COMISS 0x134/0x138 -> 0x140/0x144, MOVZX byte 0x129 -> MOV dword 0x12C, MOV byte 0x12A -> 0x134. 120 votes for +8 from 0x140. | fixed: `GetRuntimeData()` (SE, <1130), `GetAERuntimeData()` (1130+), `GetRuntimeData2()` (0x140 / 0x148) |
+| F15 | SkyrimVM on 1.7.99+: `BSTEventSink<TESAmiiboTouchEvent>` and `BSTEventSink<TESAmiiboForcedStopDetectionEvent>` are inserted at 0x180, so the four later sinks, the singleton tag, the StatsEvent source and every member (from `impl` at 0x200) move +0x10. | RTTI base list of 1.6.1170 vs 1.7.104 (`diff_facts.py`). Member detector: +0x10 from 0x200 to 0x8970, 220 votes. Matches GG's 61 `impl` call sites at 0x200 -> 0x210. | fixed: members in `RUNTIME_DATA` behind `GetRuntimeData()`; the moved bases are no longer C++ bases but `As*()` accessors, so an upcast cannot compile to the wrong offset |
