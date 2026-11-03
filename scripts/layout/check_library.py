@@ -78,7 +78,10 @@ def main():
             for off, count in cls["vtables"].items():
                 have = binary_vt.get(int(off))
                 if have is not None and have != count:
-                    out.write("%s\tvtable\t%s\tsubobject 0x%X: library %d slots, binary %d\n" % (name, runtime, int(off), count, have))
+                    # With AE enabled, MenuEventHandler and PlayerInputHandler keep only the dtor
+                    # and CanProcess virtual (the rest dispatch through the runtime slot).
+                    check = "vtable-dispatch" if count == 2 and have > 2 else "vtable"
+                    out.write("%s\t%s\t%s\tsubobject 0x%X: library %d slots, binary %d\n" % (name, check, runtime, int(off), count, have))
                     problems += 1
             primary = rec["tables"][0] if rec["tables"] and rec["tables"][0] and rec["tables"][0].get("kind") != "funcs" else None
             if primary and primary.get("rtti"):
@@ -93,7 +96,9 @@ def main():
                 for off, _, base in cls["bases"]:
                     have.setdefault(leaf_of_lib(base), []).append(off)
                 for leaf in sorted(set(want) & set(have)):
-                    if sorted(set(want[leaf])) != sorted(set(have[leaf])):
+                    # The library may reach some bases through accessors instead of declaring them,
+                    # so only a declared base at an offset the binary does not have is wrong.
+                    if set(have[leaf]) - set(want[leaf]):
                         # Container templates (BSTHashMap and kin) are modeled flatter than the
                         # game's empty trait bases. Their data offsets still agree, so they are
                         # reported apart from real base moves.
@@ -103,10 +108,11 @@ def main():
                         problems += 1
         for pair, report in zip(("1.5.97->1.6.1170", "1.6.1170->1.7.104"), moves):
             entry = next((e for e in report if e.get("name") == name), None)
-            if not entry:
+            if not entry or not entry.get("moves"):
                 continue
             for first, last, delta, votes in entry["moves"]:
-                hit = [m for m in cls["members"] if first <= m[0] <= last]
+                # Pads and vfptrs are not readable members, so they cannot be read wrong.
+                hit = [m for m in cls["members"] if first <= m[0] <= last and not m[2].startswith(("_pad", "{vfptr}", "&"))]
                 if hit:
                     sample = "; ".join("0x%X %s" % (m[0], m[2][-60:]) for m in hit[:4])
                     out.write("%s\tmember\t%s\tmoved 0x%X..0x%X by %+#x (%d votes), visible: %s%s\n" % (
