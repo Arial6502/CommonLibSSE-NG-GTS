@@ -3,6 +3,8 @@
 #include "RE/B/BSAtomic.h"
 #include "RE/B/bhkSerializable.h"
 
+#include "SKSE/Version.h"
+
 namespace RE
 {
 	struct bhkPickData;
@@ -75,19 +77,40 @@ namespace RE
 		std::uint64_t                 unkC5C0;                    // C5C0
 		BGSAcousticSpaceListener*     acousticSpaceListener;      // C5C8
 		hkpSuspendInactiveAgentsUtil* suspendInactiveAgentsUtil;  // C5D0
-		std::uint32_t                 unkC5D8;                    // C5D8 - incremented per frame
-		std::uint32_t                 unkC5DC;                    // C5DC
-		std::uint32_t                 unkC5E0;                    // C5E0
-		std::uint32_t                 unkC5E4;                    // C5E4
-		std::uint32_t                 unkC5E8;                    // C5E8
-		std::uint32_t                 unkC5EC;                    // C5EC
-		float                         tau;                        // C5F0
-		float                         damping;                    // C5F4
-		std::uint8_t                  unkC5F8;                    // C5F8
-		bool                          toggleCollision;            // C5F9
-		std::uint16_t                 unkC5FA;                    // C5FA
-		std::uint16_t                 unkC5FC;                    // C5FC
-		std::uint16_t                 unkC5FE;                    // C5FE
+
+	private:
+		std::uint8_t _padTailRuntimeData[0x28];  // C5D8 - use GetTailRuntimeData()
+
+	public:
+		// 1.7.99 inserts 0x108 bytes at 0xC5D8 (a bhkWorldCinfo among them), so this block
+		// moves to 0xC6E0. SE and 1.6 offsets.
+		struct TAIL_RUNTIME_DATA
+		{
+			std::uint32_t                 unkC5D8;                    // C5D8 - incremented per frame
+			std::uint32_t                 unkC5DC;                    // C5DC
+			std::uint32_t                 unkC5E0;                    // C5E0
+			std::uint32_t                 unkC5E4;                    // C5E4
+			std::uint32_t                 unkC5E8;                    // C5E8
+			std::uint32_t                 unkC5EC;                    // C5EC
+			float                         tau;                        // C5F0
+			float                         damping;                    // C5F4
+			std::uint8_t                  unkC5F8;                    // C5F8
+			bool                          toggleCollision;            // C5F9
+			std::uint16_t                 unkC5FA;                    // C5FA
+			std::uint16_t                 unkC5FC;                    // C5FC
+			std::uint16_t                 unkC5FE;                    // C5FE
+		};
+		static_assert(sizeof(TAIL_RUNTIME_DATA) == 0x28);
+
+		[[nodiscard]] inline TAIL_RUNTIME_DATA& GetTailRuntimeData() noexcept
+		{
+			return REL::RelocateMemberIfNewer<TAIL_RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_7_99, this, 0xC5D8, 0xC6E0);
+		}
+
+		[[nodiscard]] inline const TAIL_RUNTIME_DATA& GetTailRuntimeData() const noexcept
+		{
+			return REL::RelocateMemberIfNewer<TAIL_RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_7_99, this, 0xC5D8, 0xC6E0);
+		}
 	};
 	static_assert(sizeof(bhkWorld) == 0xC600);
 }
