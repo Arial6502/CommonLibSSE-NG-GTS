@@ -86,6 +86,8 @@ PATTERNS = [
     ("RelocationID", re.compile(r"(?:REL::)?RelocationID\(" + _NUM + "," + _NUM + r"[,)]")),
     ("RELOCATION_ID", re.compile(r"RELOCATION_ID\(" + _NUM + "," + _NUM + r"\)")),
     ("VariantID", re.compile(r"(?:REL::)?VariantID\(" + _NUM + "," + _NUM + ",")),
+    # constexpr REL::VariantID RTTI_X(se, ae, vr) declares the variable before the parenthesis.
+    ("VariantID", re.compile(r"VariantID\s+\w+\(" + _NUM + "," + _NUM + ",")),
 ]
 BARE_ID = re.compile(r"REL::ID\(" + _NUM + r"\)")
 # RELOCATION_ID(se, AE_CHECK(SKSE::RUNTIME_SSE_x_y_z, older, newer))

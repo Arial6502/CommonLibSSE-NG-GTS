@@ -80,7 +80,7 @@ All are committed scripts, so every result can be rerun (see "How to rerun").
   - BSInputEventQueue, BSSystemUtility, BSWin32SystemUtility: not in GTS.
   - BSSaveDataSystemUtility: 1.7.99 inserts six slots at 05, but only GTS's unnamed `Unk_05`.. move. The named slots 01-04 do not.
   - LookHandler, BookMenu, TESTopicInfo: 1.7.99 only appends data at the end. No existing member moves and the library never allocates or copies these.
-  - SixaxisEvent, MotionGestureEvent, AmiiboEvent and their INPUT_EVENT_TYPE values: new 1.7 classes, purely additive. Deferred.
+- [x] P5. 1.7 input event classes and handler slots (F29).
 - [x] P5. 1.7.104 mismatches beyond GG's list: FirstPersonState (F22), LockpickingMenu (F23, GG wrong), BSInputDeviceManager (F26).
 - [x] P6. Flatrim builds. GTSPlugin breaks D1 causes, found by search (not built, D7): `skyrimVM->impl` in `Managers/Audio/MoansLaughs.cpp:24` and `Utils/PapyrusUtils.hpp:31,49,65,97`. Use `skyrimVM->GetRuntimeData().impl`. No other hidden member, moved base or removed override is used.
 - [x] P7. Final rerun of every lever (below).
@@ -88,7 +88,7 @@ All are committed scripts, so every result can be rerun (see "How to rerun").
 
 ## Last full run
 
-- `audit_ids.py`: ok=8558. Not ok: 3 bare SE-only ids (F8), 2 unused 1.7 vtables (F3), 687 unused AE vtables plus `Set_CStr` and the guarded Logger id (F1, F4, F9).
+- `audit_ids.py` (now including RTTI and NiRTTI ids): ok=16291. Not ok: 3 bare SE-only ids (F8), 2 unused 1.7 vtables (F3), 6 ids that exist only on 1.7 (the new event classes, F29), 1271 AE vtable and RTTI ids in neither AE library, none of them used by a class except CreationClubMenu (F4, F28), plus `Set_CStr` and the guarded Logger id (F1, F9).
 - `check_library.py` over 1150 library classes with facts: 37 `vtable-dispatch` (by design, F18), 6 `base-template` (AttackAnimationArrayMap's BSTHashMap is modeled flatter than the game's empty trait bases; same data offsets), 9 `base` (all PlayerCamera's empty singleton base, F25). Nothing else.
 - `check_accessors.py`: 6 rows, all "unconfirmed", all reviewed against the raw tallies and correct. ArrowProjectile 0x1E0 -> 0x1E8: seven functions show 0x1E0/0x1E8 -> 0x1E8/0x1F0. Inventory3DManager 0x58 -> 0x60: `originalExtra` is an ExtraDataList, which grew 8 in 1.6.629, and the tail +8 is confirmed. BSAnimationGraphManager 0x20 -> 0x28: belongs to the nested BSAnimationGraphVariableCache, not the manager; the manager's own 0x98 -> 0xA0 is confirmed by 10 votes.
 - Vtable slot insertions: 1.6.1170 -> 1.7.104 only in MenuEventHandler / PlayerInputHandler descendants (F18) and BSSaveDataSystemUtility. SE -> 1.6.1170 only equal length delete / insert pairs (stub pairing noise, slot counts equal).
@@ -124,35 +124,5 @@ All are committed scripts, so every result can be rerun (see "How to rerun").
 | F25 | PlayerCamera: an empty base (BSTSingletonSDM) sits at 0x39 in the binary and 0x38 in the library. It holds no data. | RTTI | won't fix, no data involved |
 | F26 | BSInputDeviceManager on 1.7.99+: 0x10 bytes are inserted after `devices[4]`, so the runtime block moves from 0x80 to 0x90. The accessor used 0x80 for SE and AE alike, and flatrim exposed the block as plain members. | devices at 0x60 / 0x68 unchanged; 0x80 / 0x81 / 0x88 / 0xE0 -> 0x90 / 0x91 / 0x98 / 0xF0 | fixed: versioned accessor, block hidden with AE |
 | F27 | bhkWorld on 1.7.99+: 0x108 bytes (a bhkWorldCinfo and more) are inserted at 0xC5D8, so the old tail (unkC5D8 .. unkC5FE, with tau and damping) moves to 0xC6E0. GG models the new data as an appendix at 0xC5D8 on top of the old tail. | 1170 -> 1.7.104: 0xC5D8 .. 0xC5F9 -> +0x108, 40 votes; members up to 0xC5D0 unchanged. GG's own 1.7 block puts tau / damping at 0xC6F8 / 0xC6FC, the same answer. | fixed: tail behind `GetTailRuntimeData()` |
-
-## Known unverifiable
-
-3975 RE classes are in the library. 1138 of them have binary facts on all three runtimes
-(a vtable id or named functions with `this` accesses) and pass the checks above. The other
-classes have neither, so no binary fact speaks about them directly. They are mostly
-templates, small value types (NiPoint3, hkVector4, NiBound), event payloads, Scaleform and
-Havok SDK structs, and nested helper types. Where one of them is embedded in a checked
-class, a move inside it shows up in that class's run (ExtraDataList inside TESObjectREFR,
-the variable cache inside BSAnimationGraphManager).
-
-Of the RE types GTSPlugin names with an explicit `RE::` prefix, 102 are library classes and
-81 of those have facts. The rest are value types and Havok structs of the same kind.
-
-Not covered at all: member offsets that no function of the class touches, and members
-whose SE offset was already wrong in the library. The harness proves where layouts
-change between runtimes. It cannot prove an SE offset that never changes.
-
-## How to rerun
-
-1. In Ghidra (eval_python), on both AE programs:
-   `exec(open(r"<repo>/scripts/layout/ghidra_namespaces.py").read()); dump(r"ns_<version>.json")`
-2. `python scripts/layout/classes.py . all.json --ns ns_1.6.1170.json ns_1.7.104.json --crosswalk <crosswalk.tsv>`
-3. In Ghidra, on each of the three programs:
-   `exec(open(r"<repo>/scripts/layout/ghidra_facts.py").read()); run(r"all.json", r"f_<version>.jsonl", mode="w")`
-   About 1.5 hours per program when all three run at once.
-4. Compile a TU that includes `RE/Skyrim.h` with `/d1reportAllClassLayout` for flatrim, then
-   `python scripts/layout/parse_layout.py layout.txt lib_flat.json`
-5. `python scripts/layout/diff_facts.py f_1.5.97.jsonl f_1.6.1170.jsonl --crosswalk <crosswalk.tsv> --json m_se_ae.json`
-   and `python scripts/layout/diff_facts.py f_1.6.1170.jsonl f_1.7.104.jsonl --json m_16_17.json`
-6. `python scripts/layout/check_library.py lib_flat.json f_1.5.97.jsonl f_1.6.1170.jsonl f_1.7.104.jsonl m_se_ae.json m_16_17.json check.tsv`
-   and `python scripts/layout/check_accessors.py . m_se_ae.json m_16_17.json accessors.tsv`
+| F28 | `audit_ids.py` never matched RTTI declarations (`REL::VariantID RTTI_X(se, ae, vr)` names the variable before the parenthesis), so no RTTI id had been audited. With the pattern fixed, three class RTTI constants use AE ids that exist in neither AE library: NiObjectNET (392519), NiParticleSystem (398437) and CreationClubMenu (394235). `skyrim_cast` to the first two failed on 1.6.1170 and 1.7.104. | TypeDescriptors `.?AVNiObjectNET@@` and `.?AVNiParticleSystem@@` sit at ids 502517 and 502623 in both AE binaries. `.?AVCreationClubMenu@@` is in neither, the menu is gone from 1.6.1130 on. | fixed NiObjectNET and NiParticleSystem; CreationClubMenu commented, kept so a use fails loudly |
+| F29 | The 1.7 input event classes: SixaxisEvent (type 6, 0x90), MotionGestureEvent (type 7, 0x38), AmiiboEvent (type 8, 0x40), all `IDEvent` with no new virtuals. MenuEventHandler's new slots are `bool (Event*)`, as GG has them. PlayerInputHandler's are `void (Event*, PlayerControlsData*)`; GG declares them `bool (Event*)`. | RTTI and vtable ids resolve to the right TypeDescriptors and COLs. The constructors write type 6 / 7 / 8 to +0xC and touch fields up to 0x80 / 0x34 / 0x38 (Amiibo's ctor is inlined code Ghidra had not defined, found by scanning every instruction). Slot defaults: MenuEventHandler `xor al,al; ret`, PlayerInputHandler `ret`; LookHandler's Sixaxis override reads RCX, RDX, R8 and returns no value; AttackBlockHandler's MotionGesture override reads the event at +0x2C. | added: classes, `INPUT_EVENT_TYPE` values, `InputEvent::As*Event()` (null below 1.7.99), `ProcessMotionGesture` / `ProcessSixaxis` on both handler bases |
