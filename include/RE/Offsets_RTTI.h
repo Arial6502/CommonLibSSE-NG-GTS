@@ -286,7 +286,7 @@ namespace RE
 	constexpr REL::VariantID RTTI_BSTempNodeManager(684840, 392531, 0x1eda940);
 	constexpr REL::VariantID RTTI_NiNode(684841, 392532, 0x1eda920);
 	constexpr REL::VariantID RTTI_NiAVObject(684827, 392520, 0x1eda610);
-	constexpr REL::VariantID RTTI_NiObjectNET(684826, 392519, 0x1eda5e8);
+	constexpr REL::VariantID RTTI_NiObjectNET(684826, 502517, 0x1eda5e8);
 	constexpr REL::VariantID RTTI_NiObject(684825, 392518, 0x1eda5c8);
 	constexpr REL::VariantID RTTI_NiRefObject(684824, 392517, 0x1eda5a0);
 	constexpr REL::VariantID RTTI_BSAutoQueuedResourceCollection_TESModelDB__TESQueuedHandles_(684830, 392521, 0x1eda6b0);
@@ -2008,6 +2008,7 @@ namespace RE
 	constexpr REL::VariantID RTTI_GRefCountBase_GFxFunctionHandler_2_(686411, 394231, 0x1efd798);
 	constexpr REL::VariantID RTTI_GFxFunctionHandler(686410, 394230, 0x1efd768);
 	constexpr REL::VariantID RTTI_MenuEventHandler(686414, 394234, 0x1efd840);
+	// The Creation Club menu is gone from 1.6.1130 on; its AE id is from older AE releases.
 	constexpr REL::VariantID RTTI_CreationClubMenu(686415, 394235, 0x0);
 	constexpr REL::VariantID RTTI_IMenu(686416, 394236, 0x1efd890);
 	constexpr REL::VariantID RTTI_FxDelegateHandler(686412, 394232, 0x1efd7d8);
@@ -2678,6 +2679,10 @@ namespace RE
 	constexpr REL::VariantID RTTI_MovementHandler(687051, 394900, 0x1f0b4e8);
 	constexpr REL::VariantID RTTI_SprintHandler(687053, 394902, 0x1f0b538);
 	constexpr REL::VariantID RTTI_AttackBlockHandler(687060, 394909, 0x1f0b658);
+	// 1.7.99 only, no SE or VR counterpart.
+	constexpr REL::VariantID RTTI_AmiiboEvent(0, 564083, 0);
+	constexpr REL::VariantID RTTI_MotionGestureEvent(0, 564082, 0);
+	constexpr REL::VariantID RTTI_SixaxisEvent(0, 564068, 0);
 	constexpr REL::VariantID RTTI_ReadyWeaponHandler(687054, 394903, 0x1f0b560);
 	constexpr REL::VariantID RTTI_ActivateHandler(687057, 394906, 0x1f0b5e0);
 	constexpr REL::VariantID RTTI_AutoMoveHandler(687055, 394904, 0x1f0b590);
@@ -6207,7 +6212,7 @@ namespace RE
 	constexpr REL::VariantID RTTI_BSRotAccumTransfInterpolator(690579, 398434, 0x1f63e18);
 	constexpr REL::VariantID RTTI_BSTreadTransfInterpolator(690580, 398435, 0x1f63e50);
 	constexpr REL::VariantID RTTI_BSFrustumFOVController(690581, 398436, 0x1f63e80);
-	constexpr REL::VariantID RTTI_NiParticleSystem(690582, 398437, 0x1f63eb0);
+	constexpr REL::VariantID RTTI_NiParticleSystem(690582, 502623, 0x1f63eb0);
 	constexpr REL::VariantID RTTI_NiPSysEmitterCtlr(690583, 398438, 0x1f63ed8);
 	constexpr REL::VariantID RTTI_NiPSysModifierCtlr(690584, 398439, 0x1f63f00);
 	constexpr REL::VariantID RTTI_NiPSysGravityModifier(690585, 398440, 0x1f63f30);
