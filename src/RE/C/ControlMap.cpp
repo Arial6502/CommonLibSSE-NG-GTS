@@ -12,17 +12,18 @@ namespace RE
 
 	std::int8_t ControlMap::AllowTextInput(bool a_allow)
 	{
+		auto& count = GetRuntimeData().textEntryCount;
 		if (a_allow) {
-			if (textEntryCount != -1) {
-				++textEntryCount;
+			if (count != -1) {
+				++count;
 			}
 		} else {
-			if (textEntryCount != 0) {
-				--textEntryCount;
+			if (count != 0) {
+				--count;
 			}
 		}
 
-		return textEntryCount;
+		return count;
 	}
 
 	std::uint32_t ControlMap::GetMappedKey(std::string_view a_eventID, INPUT_DEVICE a_device, InputContextID a_context) const
@@ -70,21 +71,22 @@ namespace RE
 
 	void ControlMap::ToggleControls(UEFlag a_flags, bool a_enable)
 	{
-		auto oldState = enabledControls;
+		auto& data = GetRuntimeData();
+		auto  oldState = data.enabledControls;
 
 		if (a_enable) {
-			enabledControls.set(a_flags);
-			if (unk11C != UEFlag::kInvalid) {
-				unk11C.set(a_flags);
+			data.enabledControls.set(a_flags);
+			if (data.unk11C != UEFlag::kInvalid) {
+				data.unk11C.set(a_flags);
 			}
 		} else {
-			enabledControls.reset(a_flags);
-			if (unk11C != UEFlag::kInvalid) {
-				unk11C.reset(a_flags);
+			data.enabledControls.reset(a_flags);
+			if (data.unk11C != UEFlag::kInvalid) {
+				data.unk11C.reset(a_flags);
 			}
 		}
 
-		UserEventEnabled event{ enabledControls, oldState };
+		UserEventEnabled event{ data.enabledControls, oldState };
 		SendEvent(std::addressof(event));
 	}
 }

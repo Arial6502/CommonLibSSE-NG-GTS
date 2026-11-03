@@ -41,12 +41,11 @@ All are committed scripts, so every result can be rerun.
 | `scripts/audit_ids.py` | Every id the sources use resolves in each library. | done |
 | `scripts/test_addresslib.cpp` | `REL::IDDatabase` loads all three real libraries, rejects wrong version and format, and maps ids to the addresses Ghidra shows. 17 checks. | done, 17/17 pass |
 | Hook site check (GTSPlugin `write_call` sites) | The instruction at each AE `id + offset` is still the same call in 1.7.104. | skipped (D7) |
-| Library layout dump (`/d1reportAllClassLayout`, SE-only and AE-only configs) | What this library thinks every class looks like: size, bases, members. | todo |
-| Community PDB diff (D8) | Library AE layout vs the 1.6.1170 PDB: sizes and member offsets. Each mismatch is checked in the binary. | todo |
-| RTTI base offsets per binary | Exact base class offsets for every polymorphic class, per runtime. | todo |
-| Vtable slot diff per binary | Exact slot order. 1.6.1170 vs 1.7.104 compares ids directly. SE vs AE goes through the crosswalk. | todo |
+| Library layout dump (`/d1reportAllClassLayout`, SE-only and AE-only configs) | What this library thinks every class looks like: size, bases, members. | running |
+| Community PDB diff (D8) | Library AE layout vs the 1.6.1170 PDB: sizes and member offsets. Each mismatch is checked in the binary. | deprioritized. The PDB is derived from commonlib (SE names like `pad444` at AE 0x44C), so it is not independent. |
+| `scripts/layout/ghidra_facts.py` + `classes.py` | Per binary, for every class in `Offsets_VTABLE.h`: vtable slots as ids, RTTI base offsets (exact), and the `[this + disp]` accesses of every slot function. | written. Full run over 7729 classes in progress. |
+| `scripts/layout/diff_facts.py` | Diffs two binaries' facts. Reports base offset changes, slot insertions, and runs of member offsets that moved by the same delta. Secondary vtable accesses are normalized by the COL offset. | written. Reproduces GG's PlayerCharacter (+8 from 0x2D8) and SkyrimVM (+0x10 from 0x180) from the binaries alone, and the known 1.6.629 Actor +8. |
 | Object size per binary | Allocation size feeding each constructor, where one can be found. | todo |
-| Member shift detector | Per class, `this + disp` accesses in matched functions across runtimes. A constant delta from some offset onward means members moved. | todo |
 | Layout diff | Library dump vs the binary facts. Every mismatch becomes a finding below. | todo |
 
 ## Phases
@@ -58,6 +57,12 @@ All are committed scripts, so every result can be rerun.
 - [x] P2. REL. Format 5 loader. Minor version >= 6 classified as AE. `RUNTIME_SSE_1_7_99` / `RUNTIME_SSE_1_7_104`. `Module::IsAtLeast`. GG's `report_and_error` return fixes. `AE_CHECK`.
 - [x] P2. Fix the ids from F1, F2 and F7.
 - [ ] P3. Layout harness. Library dump, RTTI bases, vtable diff, sizes, shift detector, diff report.
+  - [x] Fact extractor and differ, validated on PlayerCharacter, SkyrimVM, Actor.
+  - [ ] Full fact runs: SE 1.5.97, AE 1.6.1170, AE 1.7.104 (7729 classes each).
+  - [ ] Library layout dumps (SE-only, AE-only).
+  - [ ] Attribute each detected move to the most-base class that shows it, so derived classes don't repeat it.
+  - [ ] Review list: per class, binary moves vs what the library models. Every class lands in fixed, already-correct, or unverifiable.
+  - [ ] Object sizes per binary (allocation sites).
 - [ ] P4. 1.6.1170 parity. Port GG's 1.6.1130 changes and verify each one in Ghidra: ControlMap, Renderer, BGSSaveLoadManager, TES, TESContainer, BSSystemUtility, BSWin32SystemUtility, BGSDefaultObjectManager count (366 on AE, not 364), Console / BSScaleformTranslator / Script ids.
 - [ ] P4. Fix every 1.6.1170 mismatch the layout harness reports.
 - [ ] P5. 1.7.104. Port and verify GG's changes: SkyrimVM (+0x10 at 0x180), PlayerCharacter (+8 at 0x2D8), MenuEventHandler / PlayerInputHandler (+2 slots), HeldStateHandler, BSInputEventQueue, AttackBlockHandler, LookHandler, LockpickingMenu, BookMenu, bhkWorld, TESTopicInfo, BSSystemUtility (+1 slot), BSSaveDataSystemUtility (+6 slots), BGSDefaultObjectManager remap, new input event classes.
@@ -78,3 +83,5 @@ All are committed scripts, so every result can be rerun.
 | F7 | Bare `REL::ID(n)` resolves the same number on SE and AE. Four were AE ids that also ran on SE: `BGSAddToPlayerInventoryEvent::GetIndex`, `BGSStoryEventManager::GetSingleton` and `AddEvent_Impl`, `PlayerCharacter::AddPlayerAddItemEvent`. | SE twins from the crosswalk, each one checked in the SE Ghidra db and matching GG. | fixed |
 | F8 | The other bare ids are fine in flatrim. `BSShaderTextureSet::Ctor` (SE 99886) is only called on the SE path of `Create()`, and AE inlines that ctor (memset, `NiObject::ctor`, vector ctor in the caller). `LooseFileStream` is compiled out when AE is on. Its AE ctor would be 70004 (same slot after `Allocate` and two `BSFixedString` inits in the matched caller). | Ghidra, SE 99849 vs AE 106494, SE 68636 vs AE 69981 | OK, not changed |
 | F9 | `Logger` uses AE 380738 only below 1.6.1130. The log folder name id changed in 1130, so the gate is intentional. | User | OK |
+| F10 | ControlMap: from 1.6.1130 a new input context grows `controlMap[]` by one, so every field from `linkedMappings` on is +8. The library had them as plain members at SE offsets. | `disps_by_id.py` on 11 ControlMap functions (GG ids): e.g. ToggleControls touches 0x118/0x11C on SE and 0x120/0x124 on 1170 and 1.7.104. | fixed: `RUNTIME_DATA` behind `GetRuntimeData()`, pad in the flatrim layout |
+| F11 | BGSSaveLoadManager: from 1.6.1130, 0x48 bytes are inserted at 0x2B0. The save thread (`unk2B0`) and request queue (`unk370`) move to 0x2F8 / 0x3B8. Members up to 0x2A8 do not move. | `Save_Impl` reads the thread at 0x2B0 on SE and 0x2F8 on 1170 and 1.7.104. GenerateCharacterID, PopulateSaveList and LoadMostRecentSaveGame touch the same offsets on all three. | fixed: `RUNTIME_DATA` behind `GetRuntimeData()` |

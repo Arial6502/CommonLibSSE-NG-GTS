@@ -11,6 +11,8 @@
 #include "RE/R/RaceSexMenuEvent.h"
 #include "RE/R/Request.h"
 
+#include "SKSE/Version.h"
+
 namespace RE
 {
 	class BSSaveDataEvent;
@@ -89,6 +91,24 @@ namespace RE
 		void Load(const char* a_fileName, bool a_checkForMods);
 
 		bool LoadMostRecentSaveGame();
+
+		struct RUNTIME_DATA
+		{
+			Thread                                                                  unk2B0;  // 000 (SE 2B0, AE 2F8)
+			BSTCommonStaticMessageQueue<BSTSmartPointer<bgs::saveload::Request>, 8> unk370;  // 0C0
+		};
+		static_assert(sizeof(RUNTIME_DATA) == 0x120);
+
+		// 1.6.1130 inserts 0x48 bytes at 0x2B0, so this block moves to 0x2F8.
+		[[nodiscard]] inline RUNTIME_DATA& GetRuntimeData() noexcept
+		{
+			return REL::RelocateMemberIfNewer<RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_6_1130, this, 0x2B0, 0x2F8);
+		}
+
+		[[nodiscard]] inline const RUNTIME_DATA& GetRuntimeData() const noexcept
+		{
+			return REL::RelocateMemberIfNewer<RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_6_1130, this, 0x2B0, 0x2F8);
+		}
 
 		// members
 		BSTHashMap<std::uint64_t, BSFixedString> playerIDNameMap;  // 078
@@ -175,9 +195,9 @@ namespace RE
 		std::uint32_t unk2A0;  // 2A0
 		std::uint32_t unk2A4;  // 2A4
 		std::uint64_t unk2A8;  // 2A8
-		Thread        unk2B0;  // 2B0
 
-		BSTCommonStaticMessageQueue<BSTSmartPointer<bgs::saveload::Request>, 8> unk370;  // 370
+	private:
+		std::uint8_t _padRuntimeData[0x120];  // 2B0 - use GetRuntimeData()
 
 	protected:
 		bool Save_Impl(std::int32_t a_deviceID, std::uint32_t a_outputStats, const char* a_fileName);
