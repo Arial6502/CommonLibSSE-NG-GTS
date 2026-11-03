@@ -36,19 +36,21 @@ untested.
 
 ## Verification levers
 
-All are committed scripts, so every result can be rerun.
+All are committed scripts, so every result can be rerun (see "How to rerun").
 
 | Lever | What it proves | Status |
 |-------|----------------|--------|
-| `scripts/audit_ids.py` | Every id the sources use resolves in each library. | done |
-| `scripts/test_addresslib.cpp` | `REL::IDDatabase` loads all three real libraries, rejects wrong version and format, and maps ids to the addresses Ghidra shows. 17 checks. | done, 17/17 pass |
+| `scripts/audit_ids.py` | Every id the sources use resolves in each library. AE_CHECK ids are checked per runtime. | done. Only guarded or unused ids remain (F1, F3, F4, F8, F9). |
+| `scripts/test_addresslib.cpp` | `REL::IDDatabase` loads all three real libraries, rejects wrong version and format, and maps ids to the addresses Ghidra shows. | done, 17/17 pass |
 | Hook site check (GTSPlugin `write_call` sites) | The instruction at each AE `id + offset` is still the same call in 1.7.104. | skipped (D7) |
-| Library layout dump (`/d1reportAllClassLayout`, SE-only and AE-only configs) | What this library thinks every class looks like: size, bases, members. | running |
-| Community PDB diff (D8) | Library AE layout vs the 1.6.1170 PDB: sizes and member offsets. Each mismatch is checked in the binary. | deprioritized. The PDB is derived from commonlib (SE names like `pad444` at AE 0x44C), so it is not independent. |
-| `scripts/layout/ghidra_facts.py` + `classes.py` | Per binary, for every class in `Offsets_VTABLE.h`: vtable slots as ids, RTTI base offsets (exact), and the `[this + disp]` accesses of every slot function. | written. Full run over 7729 classes in progress. |
-| `scripts/layout/diff_facts.py` | Diffs two binaries' facts. Reports base offset changes, slot insertions, and runs of member offsets that moved by the same delta. Secondary vtable accesses are normalized by the COL offset. | written. Reproduces GG's PlayerCharacter (+8 from 0x2D8) and SkyrimVM (+0x10 from 0x180) from the binaries alone, and the known 1.6.629 Actor +8. |
-| Object size per binary | Allocation size feeding each constructor, where one can be found. | todo |
-| Layout diff | Library dump vs the binary facts. Every mismatch becomes a finding below. | todo |
+| `scripts/layout/parse_layout.py` | Parses an MSVC `/d1reportAllClassLayout` dump of the flatrim and SE-only builds: size, bases, members and vtable slot counts of every RE class. | done, 3975 classes |
+| Community PDB diff (D8) | Library AE layout vs the 1.6.1170 PDB. | dropped. The PDB is derived from commonlib (SE names like `pad444` at AE 0x44C), so it is not independent. |
+| `scripts/layout/ghidra_facts.py`, `ghidra_namespaces.py`, `classes.py` | Per binary and class: vtable slots as ids, RTTI base offsets (exact), and the `[this + disp]` accesses of every slot function and named member function. | done, 9645 classes on all three binaries |
+| `scripts/layout/diff_facts.py` | Diffs two binaries' facts: base offset changes, slot insertions, runs of member offsets that moved by the same delta. | done |
+| `scripts/layout/check_library.py` | Flatrim library layout vs the facts of every runtime: vtable slot counts per subobject, declared base offsets, and visible members inside a region that moves. | done. 0 open problems (see "Last full run"). |
+| `scripts/layout/check_accessors.py` | Every `RelocateMemberIfNewer` / `RelocateMember` accessor in include/RE against the measured move at its offset. | done. 6 rows, each reviewed and correct (see "Last full run"). |
+| `scripts/layout/ghidra_default_objects.py` | Default object indices each function reads, for the 1.7 remap. | done (F12) |
+| Object size per binary | Allocation size feeding each constructor. | not built. Sizes only matter where the library allocates or copies an object, and the checks above cover member offsets directly. |
 
 ## Phases
 
@@ -58,37 +60,38 @@ All are committed scripts, so every result can be rerun.
 - [x] P1. Hook site check for GTSPlugin. skip: D7.
 - [x] P2. REL. Format 5 loader. Minor version >= 6 classified as AE. `RUNTIME_SSE_1_7_99` / `RUNTIME_SSE_1_7_104`. `Module::IsAtLeast`. GG's `report_and_error` return fixes. `AE_CHECK`.
 - [x] P2. Fix the ids from F1, F2 and F7.
-- [ ] P3. Layout harness. Library dump, RTTI bases, vtable diff, sizes, shift detector, diff report.
-  - [x] Fact extractor and differ, validated on PlayerCharacter, SkyrimVM, Actor.
+- [x] P3. Layout harness.
+  - [x] Fact extractor and differ, validated on PlayerCharacter, SkyrimVM, Actor (GG's claims and the known 1.6.629 shift reproduced from the binaries alone).
   - [x] Tracker fixed twice: vtable end detection (stop only at non-executable targets), and `this` held in callee-saved registers.
-  - [x] Class list grows to 9645 classes (7999 with named functions) from Offsets_VTABLE.h, Offsets.h, class sources and Ghidra names.
-  - [ ] Full fact runs: SE 1.5.97, AE 1.6.1170, AE 1.7.104.
-  - [x] Library layout dumps (SE-only, AE-only, flatrim). 3965 RE classes each.
-  - [ ] Attribute each detected move to the most-base class that shows it, so derived classes don't repeat it.
-  - [ ] Review list: per class, binary moves vs what the library models. Every class lands in fixed, already-correct, or unverifiable.
-  - [ ] Object sizes per binary (allocation sites).
-- [ ] P4. 1.6.1170 parity. Port GG's 1.6.1130 changes and verify each one in Ghidra.
-  - [x] ControlMap (F10)
-  - [x] BGSSaveLoadManager (F11)
-  - [x] TESContainer: only fills padding at 0x14, nothing moves. skip.
-  - [x] Script id (F1)
-  - [x] TES (F14)
-  - [x] Renderer: GTS does not model the render target data (only the older BSRenderManager), nothing to fix. The harness covers BSRenderManager.
-  - [x] BSSystemUtility, BSWin32SystemUtility: not in GTS. skip.
-  - [x] BGSDefaultObjectManager count and 1.7 remap (F12, F13)
+  - [x] Class list: 9645 classes (7999 with named functions) from Offsets_VTABLE.h, Offsets.h, class sources and Ghidra names.
+  - [x] Full fact runs on SE 1.5.97, AE 1.6.1170, AE 1.7.104.
+  - [x] Library layout dumps (SE-only, AE-only, flatrim).
+  - [x] Review of every reported class: fixed, already correct, or listed as won't fix.
+  - [x] Object sizes per binary. skip: see levers.
+- [x] P4. 1.6.1170 parity. GG's 1.6.1130 list, each verified in Ghidra.
+  - [x] ControlMap (F10), BGSSaveLoadManager (F11), TES (F14), BGSDefaultObjectManager (F12, F13), Script id (F1).
+  - [x] TESContainer: only fills padding at 0x14, nothing moves.
+  - [x] Renderer: GTS does not model the render target data (only the older BSRenderManager).
+  - [x] BSSystemUtility, BSWin32SystemUtility: not in GTS.
   - [x] Console / BSScaleformTranslator ids: SelectedRef already uses 504099 (1130+). GTS has no GetCommandScriptParentQuest or translator call.
-- [ ] P4. Fix every 1.6.1170 mismatch the layout harness reports.
-- [ ] P5. 1.7.104. Port and verify GG's changes. Done so far: SkyrimVM (F15).
-  Done: PlayerCharacter (F16), MenuEventHandler / PlayerInputHandler / HeldStateHandler slots (F18), AttackBlockHandler (F19).
+- [x] P4. Every 1.6.1170 mismatch the harness reported: Explosion (F20), BeamProjectile (F21), hkpCharacterRigidBody (F24).
+- [x] P5. 1.7.104, GG's list: SkyrimVM (F15), PlayerCharacter (F16), input handler slots (F18), AttackBlockHandler (F19, GG wrong), bhkWorld (F27, GG wrong).
   Not changed, with reason:
   - BSInputEventQueue, BSSystemUtility, BSWin32SystemUtility: not in GTS.
   - BSSaveDataSystemUtility: 1.7.99 inserts six slots at 05, but only GTS's unnamed `Unk_05`.. move. The named slots 01-04 do not.
-  - LookHandler, LockpickingMenu, BookMenu, bhkWorld, TESTopicInfo: 1.7.99 only appends data at the end. No existing member moves and the library never allocates or copies these.
+  - LookHandler, BookMenu, TESTopicInfo: 1.7.99 only appends data at the end. No existing member moves and the library never allocates or copies these.
   - SixaxisEvent, MotionGestureEvent, AmiiboEvent and their INPUT_EVENT_TYPE values: new 1.7 classes, purely additive. Deferred.
-  Remaining: whatever the full harness run reports beyond GG's list.
-- [ ] P5. Fix every 1.7.104 mismatch the layout harness reports beyond GG's list.
-- [ ] P6. Build flatrim. Try a GTSPlugin build against it and list the breaks D1 causes, without editing GTSPlugin (D7).
-- [ ] P7. Final rerun of every lever. Update this file.
+- [x] P5. 1.7.104 mismatches beyond GG's list: FirstPersonState (F22), LockpickingMenu (F23, GG wrong), BSInputDeviceManager (F26).
+- [x] P6. Flatrim builds. GTSPlugin breaks D1 causes, found by search (not built, D7): `skyrimVM->impl` in `Managers/Audio/MoansLaughs.cpp:24` and `Utils/PapyrusUtils.hpp:31,49,65,97`. Use `skyrimVM->GetRuntimeData().impl`. No other hidden member, moved base or removed override is used.
+- [x] P7. Final rerun of every lever (below).
+- [ ] P8. In-game test on 1.5.97, 1.6.1170 and 1.7.104. The user's call.
+
+## Last full run
+
+- `audit_ids.py`: ok=8558. Not ok: 3 bare SE-only ids (F8), 2 unused 1.7 vtables (F3), 687 unused AE vtables plus `Set_CStr` and the guarded Logger id (F1, F4, F9).
+- `check_library.py` over 1150 library classes with facts: 37 `vtable-dispatch` (by design, F18), 6 `base-template` (AttackAnimationArrayMap's BSTHashMap is modeled flatter than the game's empty trait bases; same data offsets), 9 `base` (all PlayerCamera's empty singleton base, F25). Nothing else.
+- `check_accessors.py`: 6 rows, all "unconfirmed", all reviewed against the raw tallies and correct. ArrowProjectile 0x1E0 -> 0x1E8: seven functions show 0x1E0/0x1E8 -> 0x1E8/0x1F0. Inventory3DManager 0x58 -> 0x60: `originalExtra` is an ExtraDataList, which grew 8 in 1.6.629, and the tail +8 is confirmed. BSAnimationGraphManager 0x20 -> 0x28: belongs to the nested BSAnimationGraphVariableCache, not the manager; the manager's own 0x98 -> 0xA0 is confirmed by 10 votes.
+- Vtable slot insertions: 1.6.1170 -> 1.7.104 only in MenuEventHandler / PlayerInputHandler descendants (F18) and BSSaveDataSystemUtility. SE -> 1.6.1170 only equal length delete / insert pairs (stub pairing noise, slot counts equal).
 
 ## Findings
 
@@ -121,3 +124,35 @@ All are committed scripts, so every result can be rerun.
 | F25 | PlayerCamera: an empty base (BSTSingletonSDM) sits at 0x39 in the binary and 0x38 in the library. It holds no data. | RTTI | won't fix, no data involved |
 | F26 | BSInputDeviceManager on 1.7.99+: 0x10 bytes are inserted after `devices[4]`, so the runtime block moves from 0x80 to 0x90. The accessor used 0x80 for SE and AE alike, and flatrim exposed the block as plain members. | devices at 0x60 / 0x68 unchanged; 0x80 / 0x81 / 0x88 / 0xE0 -> 0x90 / 0x91 / 0x98 / 0xF0 | fixed: versioned accessor, block hidden with AE |
 | F27 | bhkWorld on 1.7.99+: 0x108 bytes (a bhkWorldCinfo and more) are inserted at 0xC5D8, so the old tail (unkC5D8 .. unkC5FE, with tau and damping) moves to 0xC6E0. GG models the new data as an appendix at 0xC5D8 on top of the old tail. | 1170 -> 1.7.104: 0xC5D8 .. 0xC5F9 -> +0x108, 40 votes; members up to 0xC5D0 unchanged. GG's own 1.7 block puts tau / damping at 0xC6F8 / 0xC6FC, the same answer. | fixed: tail behind `GetTailRuntimeData()` |
+
+## Known unverifiable
+
+3975 RE classes are in the library. 1138 of them have binary facts on all three runtimes
+(a vtable id or named functions with `this` accesses) and pass the checks above. The other
+classes have neither, so no binary fact speaks about them directly. They are mostly
+templates, small value types (NiPoint3, hkVector4, NiBound), event payloads, Scaleform and
+Havok SDK structs, and nested helper types. Where one of them is embedded in a checked
+class, a move inside it shows up in that class's run (ExtraDataList inside TESObjectREFR,
+the variable cache inside BSAnimationGraphManager).
+
+Of the RE types GTSPlugin names with an explicit `RE::` prefix, 102 are library classes and
+81 of those have facts. The rest are value types and Havok structs of the same kind.
+
+Not covered at all: member offsets that no function of the class touches, and members
+whose SE offset was already wrong in the library. The harness proves where layouts
+change between runtimes. It cannot prove an SE offset that never changes.
+
+## How to rerun
+
+1. In Ghidra (eval_python), on both AE programs:
+   `exec(open(r"<repo>/scripts/layout/ghidra_namespaces.py").read()); dump(r"ns_<version>.json")`
+2. `python scripts/layout/classes.py . all.json --ns ns_1.6.1170.json ns_1.7.104.json --crosswalk <crosswalk.tsv>`
+3. In Ghidra, on each of the three programs:
+   `exec(open(r"<repo>/scripts/layout/ghidra_facts.py").read()); run(r"all.json", r"f_<version>.jsonl", mode="w")`
+   About 1.5 hours per program when all three run at once.
+4. Compile a TU that includes `RE/Skyrim.h` with `/d1reportAllClassLayout` for flatrim, then
+   `python scripts/layout/parse_layout.py layout.txt lib_flat.json`
+5. `python scripts/layout/diff_facts.py f_1.5.97.jsonl f_1.6.1170.jsonl --crosswalk <crosswalk.tsv> --json m_se_ae.json`
+   and `python scripts/layout/diff_facts.py f_1.6.1170.jsonl f_1.7.104.jsonl --json m_16_17.json`
+6. `python scripts/layout/check_library.py lib_flat.json f_1.5.97.jsonl f_1.6.1170.jsonl f_1.7.104.jsonl m_se_ae.json m_16_17.json check.tsv`
+   and `python scripts/layout/check_accessors.py . m_se_ae.json m_16_17.json accessors.tsv`
