@@ -790,6 +790,8 @@ namespace REL
 }
 
 #define RELOCATION_ID(a_se, a_ae) REL::RelocationID(a_se, a_ae)
+// Picks an AE id by runtime version, for functions the address library renumbered between AE releases.
+#define AE_CHECK(a_version, a_older, a_newer) (REL::Module::get().version() < (a_version) ? (a_older) : (a_newer))
 
 #include "REL/Relocation.h"
 

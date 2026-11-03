@@ -200,6 +200,8 @@ namespace REL {
 
             memory_map &operator=(memory_map &&a_rhs) noexcept {
                 if (this != std::addressof(a_rhs)) {
+                    close();
+
                     _mapping = a_rhs._mapping;
                     a_rhs._mapping = nullptr;
 
@@ -724,16 +726,7 @@ namespace REL {
             _instance._filename = _instance._filePath = a_filename.data();
             _instance._version = a_version;
             if (a_runtime == Runtime::Unknown) {
-                switch (a_version[1]) {
-                    case 4:
-                        _instance._runtime = Runtime::VR;
-                        break;
-                    case 6:
-                        _instance._runtime = Runtime::AE;
-                        break;
-                    default:
-                        _instance._runtime = Runtime::SE;
-                }
+                _instance._runtime = runtime_of(a_version);
             } else {
                 _instance._runtime = a_runtime;
             }
@@ -795,6 +788,13 @@ namespace REL {
          */
         [[nodiscard]] static SKYRIM_REL bool IsAE() noexcept {
             return GetRuntime() == Runtime::AE;
+        }
+
+        /**
+         * Returns whether the current Skyrim runtime is an Anniversary Edition release at or above the given version.
+         */
+        [[nodiscard]] static bool IsAtLeast(Version a_version) noexcept {
+            return IsAE() && get().version() >= a_version;
         }
 
         /**
@@ -889,23 +889,23 @@ namespace REL {
             const auto version = get_file_version(_filePath);
             if (version) {
                 _version = *version;
-                switch (_version[1]) {
-                    case 4:
-                        _runtime = Runtime::VR;
-                        break;
-                    case 6:
-                        _runtime = Runtime::AE;
-                        break;
-                    default:
-                        _runtime = Runtime::SE;
-                }
+                _runtime = runtime_of(_version);
                 return true;
             }
-            return stl::report_and_error(
+            stl::report_and_error(
                     fmt::format(
                             "Failed to obtain file version info for: {}\n"
                             "Please contact the author of this script extender plugin for further assistance."sv,
                             stl::utf16_to_utf8(_filename).value_or("<unicode conversion error>"s)), a_failOnError);
+            return false;
+        }
+
+        // Minor version 4 is VR, 6 and above is AE (1.6.x and 1.7.x), the rest is SE.
+        [[nodiscard]] static Runtime runtime_of(Version a_version) noexcept {
+            if (a_version[1] == 4) {
+                return Runtime::VR;
+            }
+            return a_version[1] >= 6 ? Runtime::AE : Runtime::SE;
         }
 
         void clear();
@@ -948,6 +948,7 @@ namespace REL {
         enum class Format {
             SSEv1,
             SSEv2,
+            SSEv5,
             VR
         };
 
@@ -1042,6 +1043,8 @@ namespace REL {
                     return _instance.load_file(a_filePath.data(), a_version, 1, false);
                 case Format::SSEv2:
                     return _instance.load_file(a_filePath.data(), a_version, 2, false);
+                case Format::SSEv5:
+                    return _instance.load_file(a_filePath.data(), a_version, 5, false);
                 case Format::VR:
                     return _instance.load_csv(a_filePath.data(), a_version, false);
                 default:
@@ -1056,6 +1059,14 @@ namespace REL {
 #endif
 
         [[nodiscard]] inline std::size_t id2offset(std::uint64_t a_id) const {
+            if (!_id2rva.empty()) {
+                // Format 5 (AE 1.7.99+): a dense array indexed by ID, 0 marks an unused ID.
+                if (a_id >= _id2rva.size() || _id2rva[a_id] == 0) {
+                    report_missing_id(a_id);
+                }
+                return static_cast<std::size_t>(_id2rva[a_id]);
+            }
+
             mapping_t elem{a_id, 0};
             const auto it = std::lower_bound(
                     _id2offset.begin(),
@@ -1074,12 +1085,7 @@ namespace REL {
                 }
             }
             if (failed) {
-                stl::report_and_fail(
-                        fmt::format(
-                                "Failed to find the id within the address library: {}\n"
-                                "This means this script extender plugin is incompatible with the address "
-                                "library for this version of the game, and thus does not support it."sv,
-                                a_id));
+                report_missing_id(a_id);
             }
 
             return static_cast<std::size_t>(it->offset);
@@ -1125,25 +1131,18 @@ namespace REL {
                 return val;
             }
 
+            inline void readin_bytes(void *a_dst, std::streamsize a_count) {
+                _stream.read(static_cast<char *>(a_dst), a_count);
+            }
+
         private:
             stream_type _stream;
         };
 
         class header_t {
         public:
-            void read(istream_t &a_in, std::uint8_t a_formatVersion) {
-                std::int32_t format{};
-                a_in.readin(format);
-                if (format != a_formatVersion) {
-                    stl::report_and_fail(
-                            fmt::format(
-                                    "Unsupported address library format: {}\n"
-                                    "This means this script extender plugin is incompatible with the address "
-                                    "library available for this version of the game, and thus does not "
-                                    "support it."sv,
-                                    format));
-                }
-
+            // The caller reads and validates the format field before this runs.
+            void read(istream_t &a_in) {
                 std::int32_t version[4]{};
                 std::int32_t nameLen{};
                 a_in.readin(version);
@@ -1209,10 +1208,30 @@ namespace REL {
         bool load_file(stl::zwstring a_filename, Version a_version, std::uint8_t a_formatVersion, bool a_failOnError) {
             try {
                 istream_t in(a_filename.data(), std::ios::in | std::ios::binary);
+                const auto format = in.readout<std::int32_t>();
+
+                // AE 1.7.99 introduced format 5, so an AE runtime accepts either the
+                // delta coded format 2 or the dense format 5. SE stays on format 1.
+                if (format == 5 && a_formatVersion >= 2) {
+                    return load_dense(in, a_filename, a_version, a_failOnError);
+                }
+                if (format != a_formatVersion) {
+                    stl::report_and_error(
+                            fmt::format(
+                                    "Unsupported address library format: {}\n"
+                                    "This means this script extender plugin is incompatible with the address "
+                                    "library available for this version of the game, and thus does not "
+                                    "support it."sv,
+                                    format),
+                            a_failOnError);
+                    return false;
+                }
+
                 header_t header;
-                header.read(in, a_formatVersion);
+                header.read(in);
                 if (header.version() != a_version) {
-                    return stl::report_and_error("version mismatch"sv, a_failOnError);
+                    stl::report_and_error("version mismatch"sv, a_failOnError);
+                    return false;
                 }
 
                 auto mapname = L"CommonLibSSEOffsets-v2-"s;
@@ -1222,7 +1241,10 @@ namespace REL {
 					_id2offset = { static_cast<mapping_t*>(_mmap.data()), header.address_count() };
 				} else if (_mmap.create(mapname, byteSize)) {
 					_id2offset = { static_cast<mapping_t*>(_mmap.data()), header.address_count() };
-					unpack_file(in, header, a_failOnError);
+					if (!unpack_file(in, header, a_failOnError)) {
+						clear();
+						return false;
+					}
 					std::sort(
 						_id2offset.begin(),
 						_id2offset.end(),
@@ -1230,10 +1252,11 @@ namespace REL {
 							return a_lhs.id < a_rhs.id;
 						});
 				} else {
-					return stl::report_and_error("failed to create shared mapping"sv, a_failOnError);
+					stl::report_and_error("failed to create shared mapping"sv, a_failOnError);
+					return false;
 				}
             } catch (const std::system_error &) {
-                return stl::report_and_error(
+                stl::report_and_error(
                         fmt::format(
                                 "Failed to locate an appropriate address library with the path: {}\n"
                                 "This means you are missing the address library for this specific version of "
@@ -1246,12 +1269,70 @@ namespace REL {
             return true;
         }
 
+        // Format 5, used by the AE 1.7.99+ address library. After the format field:
+        //
+        //   0x04  u32 version[4]
+        //   0x14  char name[64], fixed size
+        //   0x54  u32 pointer size
+        //   0x58  u32 reserved
+        //   0x5C  u32 count
+        //   0x60  u32 rva[count], one RVA per ID, 0 marks an unused ID
+        //
+        // The array is indexed directly by ID, so it is read into a private buffer and no
+        // shared mapping is involved.
+        bool load_dense(istream_t &a_in, stl::zwstring a_filename, Version a_version, bool a_failOnError) {
+            std::uint32_t rawVersion[4]{};
+            a_in.readin(rawVersion);
+
+            Version version;
+            for (std::size_t i = 0; i < std::extent_v<decltype(rawVersion)>; ++i) {
+                version[i] = static_cast<std::uint16_t>(rawVersion[i]);
+            }
+            if (version != a_version) {
+                stl::report_and_error("version mismatch"sv, a_failOnError);
+                return false;
+            }
+
+            a_in.ignore(64);
+
+            const auto pointerSize = a_in.readout<std::uint32_t>();
+            std::ignore = a_in.readout<std::uint32_t>();
+            const auto count = a_in.readout<std::uint32_t>();
+
+            constexpr std::uint64_t headerSize = 0x60;
+            std::error_code ec;
+            const auto fileSize = std::filesystem::file_size(a_filename.data(), ec);
+            if (ec || pointerSize != 8 ||
+                fileSize != headerSize + static_cast<std::uint64_t>(count) * sizeof(std::uint32_t)) {
+                stl::report_and_error(
+                        fmt::format(
+                                "Malformed address library file: {}"sv,
+                                stl::utf16_to_utf8(a_filename).value_or("<unknown filename>"s)),
+                        a_failOnError);
+                return false;
+            }
+
+            _id2rva.resize(count);
+            a_in.readin_bytes(_id2rva.data(), static_cast<std::streamsize>(count * sizeof(std::uint32_t)));
+            return true;
+        }
+
+        [[noreturn]] static void report_missing_id(std::uint64_t a_id) {
+            stl::report_and_fail(
+                    fmt::format(
+                            "Failed to find the id within the address library: {}\n"
+                            "This means this script extender plugin is incompatible with the address "
+                            "library for this version of the game, and thus does not support it."sv,
+                            a_id));
+        }
+
         bool load_csv(stl::zwstring a_filename, Version a_version, bool a_failOnError) {
             auto nstring = SKSE::stl::utf16_to_utf8(a_filename).value_or(""s);
             if (!std::filesystem::exists(nstring)) {
-                return stl::report_and_error(
+                stl::report_and_error(
                         fmt::format("Required VR Address Library file {} does not exist"sv, nstring),
                         a_failOnError);
+                return false;
             }
             rapidcsv::Document in(nstring);
             std::size_t id, address_count;
@@ -1263,18 +1344,21 @@ namespace REL {
             const auto byteSize = static_cast<std::size_t>(address_count * sizeof(mapping_t));
             if (!_mmap.open(mapname, byteSize) &&
                 !_mmap.create(mapname, byteSize)) {
-                return stl::report_and_error("failed to create shared mapping"sv, a_failOnError);
+                stl::report_and_error("failed to create shared mapping"sv, a_failOnError);
+                return false;
             }
             _id2offset = {static_cast<mapping_t *>(_mmap.data()), static_cast<std::size_t>(address_count)};
             if (in.GetRowCount() > address_count + 1) {
-                return stl::report_and_error(
+                stl::report_and_error(
                         fmt::format("VR Address Library {} tried to exceed {} allocated entries."sv,
                                     version, address_count), a_failOnError);
+                return false;
             } else if (in.GetRowCount() < address_count + 1) {
-                return stl::report_and_error(
+                stl::report_and_error(
                         fmt::format(
                                 "VR Address Library {} loaded only {} entries but expected {}. Please redownload."sv,
                                 version, in.GetRowCount() - 1, address_count), a_failOnError);
+                return false;
             }
             std::size_t index = 1;
             for (; index < in.GetRowCount(); ++index) {
@@ -1329,7 +1413,8 @@ namespace REL {
                         id = a_in.readout<std::uint32_t>();
                         break;
                     default:
-                        return stl::report_and_error("unhandled type"sv, a_failOnError);
+                        stl::report_and_error("unhandled type"sv, a_failOnError);
+                        return false;
                 }
 
                 const std::uint64_t tmp = (hi & 8) != 0 ? (prevOffset / a_header.pointer_size()) : prevOffset;
@@ -1360,7 +1445,8 @@ namespace REL {
                         offset = a_in.readout<std::uint32_t>();
                         break;
                     default:
-                        return stl::report_and_error("unhandled type"sv, a_failOnError);
+                        stl::report_and_error("unhandled type"sv, a_failOnError);
+                        return false;
                 }
 
                 if ((hi & 8) != 0) {
@@ -1378,6 +1464,8 @@ namespace REL {
         void clear() {
             _mmap.close();
             _id2offset = {};
+            _id2rva.clear();
+            _id2rva.shrink_to_fit();
         }
 
         static IDDatabase _instance;
@@ -1385,6 +1473,7 @@ namespace REL {
         static inline std::mutex _initLock;
         detail::memory_map _mmap;
         std::span<mapping_t> _id2offset;
+        std::vector<std::uint32_t> _id2rva;
     };
 
     class Offset {

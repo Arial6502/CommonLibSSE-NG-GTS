@@ -198,7 +198,7 @@ namespace RE
 	float TES::GetWaterHeight(const NiPoint3& a_pos, TESObjectCELL* a_cell) const
 	{
 		using func_t = decltype(&TES::GetWaterHeight);
-		REL::Relocation<func_t> func{ RELOCATION_ID(13212, 13358) };
+		REL::Relocation<func_t> func{ RELOCATION_ID(13212, AE_CHECK(SKSE::RUNTIME_SSE_1_7_99, 13358, 523463)) };
 		return func(this, a_pos, a_cell);
 	}
 
