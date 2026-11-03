@@ -8,6 +8,7 @@
 #include "RE/I/InputDevices.h"
 #include "RE/P/PCGamepadType.h"
 #include "RE/U/UserEvents.h"
+#include "SKSE/Version.h"
 
 namespace RE
 {
@@ -82,33 +83,53 @@ namespace RE
 		static ControlMap* GetSingleton();
 
 		std::int8_t      AllowTextInput(bool a_allow);
-		constexpr bool   AreControlsEnabled(UEFlag a_flags) const noexcept { return enabledControls.all(a_flags); }
+		[[nodiscard]] bool AreControlsEnabled(UEFlag a_flags) const noexcept { return GetRuntimeData().enabledControls.all(a_flags); }
 		std::uint32_t    GetMappedKey(std::string_view a_eventID, INPUT_DEVICE a_device, InputContextID a_context = InputContextID::kGameplay) const;
 		std::string_view GetUserEventName(std::uint32_t a_buttonID, INPUT_DEVICE a_device, InputContextID a_context = InputContextID::kGameplay) const;
-		constexpr bool   IsActivateControlsEnabled() const noexcept { return enabledControls.all(UEFlag::kActivate); }
-		constexpr bool   IsConsoleControlsEnabled() const noexcept { return enabledControls.all(UEFlag::kConsole); }
-		constexpr bool   IsFightingControlsEnabled() const noexcept { return enabledControls.all(UEFlag::kFighting); }
-		constexpr bool   IsLookingControlsEnabled() const noexcept { return enabledControls.all(UEFlag::kLooking); }
-		constexpr bool   IsMenuControlsEnabled() const noexcept { return enabledControls.all(UEFlag::kMenu); }
-		constexpr bool   IsMainFourControlsEnabled() const noexcept { return enabledControls.all(UEFlag::kMainFour); }
-		constexpr bool   IsMovementControlsEnabled() const noexcept { return enabledControls.all(UEFlag::kMovement); }
-		constexpr bool   IsPOVSwitchControlsEnabled() const noexcept { return enabledControls.all(UEFlag::kPOVSwitch); }
-		constexpr bool   IsSneakingControlsEnabled() const noexcept { return enabledControls.all(UEFlag::kSneaking); }
-		constexpr bool   IsVATSControlsEnabled() const noexcept { return enabledControls.all(UEFlag::kVATS); }
-		constexpr bool   IsWheelZoomControlsEnabled() const noexcept { return enabledControls.all(UEFlag::kWheelZoom); }
+		[[nodiscard]] bool IsActivateControlsEnabled() const noexcept { return GetRuntimeData().enabledControls.all(UEFlag::kActivate); }
+		[[nodiscard]] bool IsConsoleControlsEnabled() const noexcept { return GetRuntimeData().enabledControls.all(UEFlag::kConsole); }
+		[[nodiscard]] bool IsFightingControlsEnabled() const noexcept { return GetRuntimeData().enabledControls.all(UEFlag::kFighting); }
+		[[nodiscard]] bool IsLookingControlsEnabled() const noexcept { return GetRuntimeData().enabledControls.all(UEFlag::kLooking); }
+		[[nodiscard]] bool IsMenuControlsEnabled() const noexcept { return GetRuntimeData().enabledControls.all(UEFlag::kMenu); }
+		[[nodiscard]] bool IsMainFourControlsEnabled() const noexcept { return GetRuntimeData().enabledControls.all(UEFlag::kMainFour); }
+		[[nodiscard]] bool IsMovementControlsEnabled() const noexcept { return GetRuntimeData().enabledControls.all(UEFlag::kMovement); }
+		[[nodiscard]] bool IsPOVSwitchControlsEnabled() const noexcept { return GetRuntimeData().enabledControls.all(UEFlag::kPOVSwitch); }
+		[[nodiscard]] bool IsSneakingControlsEnabled() const noexcept { return GetRuntimeData().enabledControls.all(UEFlag::kSneaking); }
+		[[nodiscard]] bool IsVATSControlsEnabled() const noexcept { return GetRuntimeData().enabledControls.all(UEFlag::kVATS); }
+		[[nodiscard]] bool IsWheelZoomControlsEnabled() const noexcept { return GetRuntimeData().enabledControls.all(UEFlag::kWheelZoom); }
 		void             ToggleControls(UEFlag a_flags, bool a_enable);
 
+		struct RUNTIME_DATA
+		{
+			BSTArray<LinkedMapping>                          linkedMappings;                // 00 (SE 0E8, AE 0F0)
+			BSTArray<InputContextID>                         contextPriorityStack;          // 18
+			stl::enumeration<UEFlag, std::uint32_t>          enabledControls;               // 30
+			stl::enumeration<UEFlag, std::uint32_t>          unk11C;                        // 34 - stored controls
+			std::int8_t                                      textEntryCount;                // 38
+			bool                                             ignoreKeyboardMouse;           // 39
+			bool                                             ignoreActivateDisabledEvents;  // 3A
+			std::uint8_t                                     pad123;                        // 3B
+			stl::enumeration<PC_GAMEPAD_TYPE, std::uint32_t> gamePadMapType;                // 3C
+		};
+		static_assert(sizeof(RUNTIME_DATA) == 0x40);
+
+		// 1.6.1130 adds an input context, so controlMap grows by one entry and this block
+		// moves from 0xE8 to 0xF0.
+		[[nodiscard]] inline RUNTIME_DATA& GetRuntimeData() noexcept
+		{
+			return REL::RelocateMemberIfNewer<RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_6_1130, this, 0xE8, 0xF0);
+		}
+
+		[[nodiscard]] inline const RUNTIME_DATA& GetRuntimeData() const noexcept
+		{
+			return REL::RelocateMemberIfNewer<RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_6_1130, this, 0xE8, 0xF0);
+		}
+
 		// members
-		InputContext*                                    controlMap[InputContextID::kTotal];  // 060
-		BSTArray<LinkedMapping>                          linkedMappings;                      // 0E8
-		BSTArray<InputContextID>                         contextPriorityStack;                // 100
-		stl::enumeration<UEFlag, std::uint32_t>          enabledControls;                     // 118
-		stl::enumeration<UEFlag, std::uint32_t>          unk11C;                              // 11C
-		std::int8_t                                      textEntryCount;                      // 120
-		bool                                             ignoreKeyboardMouse;                 // 121
-		bool                                             ignoreActivateDisabledEvents;        // 122
-		std::uint8_t                                     pad123;                              // 123
-		stl::enumeration<PC_GAMEPAD_TYPE, std::uint32_t> gamePadMapType;                      // 124
+		InputContext* controlMap[InputContextID::kTotal];  // 060
+
+	private:
+		std::uint8_t _padRuntimeData[sizeof(RUNTIME_DATA)];  // 0E8 - use GetRuntimeData()
 	};
 	static_assert(sizeof(ControlMap) == 0x128);
 }
