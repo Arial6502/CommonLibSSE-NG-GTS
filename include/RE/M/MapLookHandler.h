@@ -12,9 +12,11 @@ namespace RE
 		~MapLookHandler() override;  // 00
 
 		// override (MapInputHandler)
+#ifndef ENABLE_SKYRIM_AE  // 1.7.99 moves these slots, see MenuEventHandler / PlayerInputHandler
 		bool ProcessThumbstick(ThumbstickEvent* a_event) override;  // 03
 		bool ProcessMouseMove(MouseMoveEvent* a_event) override;    // 04
 		bool ProcessButton(ButtonEvent* a_event) override;          // 05
+#endif
 
 		// members
 		std::uint64_t unk18;  // 18

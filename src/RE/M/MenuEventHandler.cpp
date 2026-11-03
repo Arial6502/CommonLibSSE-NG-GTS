@@ -2,6 +2,7 @@
 
 namespace RE
 {
+#ifndef ENABLE_SKYRIM_AE
 	bool MenuEventHandler::ProcessKinect(KinectEvent*)
 	{
 		return false;
@@ -21,4 +22,5 @@ namespace RE
 	{
 		return false;
 	}
+#endif
 }
