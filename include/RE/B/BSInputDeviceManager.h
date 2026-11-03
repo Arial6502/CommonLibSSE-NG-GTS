@@ -4,6 +4,8 @@
 #include "RE/B/BSTSingleton.h"
 #include "RE/I/InputDevices.h"
 
+#include "SKSE/Version.h"
+
 namespace RE
 {
 	class BSIInputDevice;
@@ -53,14 +55,18 @@ namespace RE
 		bool IsGamepadConnected();
 		bool IsGamepadEnabled();
 
+		// 1.7.99 inserts 0x10 bytes after devices[], so this block moves from 0x80 to 0x90.
 		[[nodiscard]] inline RUNTIME_DATA& GetRuntimeData() noexcept
 		{
-			return REL::RelocateMember<RUNTIME_DATA>(this, 0x80, 0x98);
+			if SKYRIM_REL_VR_CONSTEXPR (REL::Module::IsVR()) {
+				return REL::RelocateMember<RUNTIME_DATA>(this, 0x98);
+			}
+			return REL::RelocateMemberIfNewer<RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_7_99, this, 0x80, 0x90);
 		}
 
 		[[nodiscard]] inline const RUNTIME_DATA& GetRuntimeData() const noexcept
 		{
-			return REL::RelocateMember<RUNTIME_DATA>(this, 0x80, 0x98);
+			return const_cast<BSInputDeviceManager*>(this)->GetRuntimeData();
 		}
 
 		// members
@@ -73,8 +79,11 @@ namespace RE
 		BSTrackedControllerDevice* unkDevice;     // 80
 		BSTrackedControllerDevice* vrDevices[2];  // 88
 		RUNTIME_DATA_CONTENT                      // 98
-#	elif !defined(ENABLE_SKYRIM_VR)
+#	elif !defined(ENABLE_SKYRIM_VR) && !defined(ENABLE_SKYRIM_AE)
 		RUNTIME_DATA_CONTENT  // 80
+#	elif !defined(ENABLE_SKYRIM_VR)
+	private:
+		std::uint8_t _padRuntimeData[sizeof(RUNTIME_DATA)];  // 80 - use GetRuntimeData()
 #	endif
 #endif
 	};
