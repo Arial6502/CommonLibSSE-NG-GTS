@@ -88,6 +88,8 @@ PATTERNS = [
     ("VariantID", re.compile(r"(?:REL::)?VariantID\(" + _NUM + "," + _NUM + ",")),
 ]
 BARE_ID = re.compile(r"REL::ID\(" + _NUM + r"\)")
+# RELOCATION_ID(se, AE_CHECK(SKSE::RUNTIME_SSE_x_y_z, older, newer))
+AE_CHECK = re.compile(r"RELOCATION_ID\(" + _NUM + r",\s*AE_CHECK\(\s*SKSE::RUNTIME_SSE_(\d+)_(\d+)_(\d+)\s*," + _NUM + "," + _NUM + r"\)")
 SOURCE_EXT = (".h", ".hpp", ".hxx", ".inl", ".cpp", ".cxx", ".cc")
 
 
@@ -117,6 +119,9 @@ def scan(roots):
                                 yield path, lineno, kind, _int(m.group(1)), _int(m.group(2))
                         for m in BARE_ID.finditer(line):
                             yield path, lineno, "ID", None, _int(m.group(1))
+                        for m in AE_CHECK.finditer(line):
+                            gate = tuple(int(m.group(i)) for i in (2, 3, 4))
+                            yield path, lineno, "AE_CHECK", _int(m.group(1)), (gate, _int(m.group(5)), _int(m.group(6)))
 
 
 def main():
@@ -131,7 +136,14 @@ def main():
 
     rows = []
     for path, lineno, kind, se_id, ae_id in scan(args.roots):
-        if kind == "ID":
+        if kind == "AE_CHECK":
+            gate, older, newer = ae_id
+            # Each AE library must hold the id that applies to its version.
+            ok16 = (older if (1, 6, 1170) < gate else newer) in ae16
+            ok17 = (older if (1, 7, 104) < gate else newer) in ae17
+            status = "ok" if ok16 and ok17 else ("missing-1.7.104" if ok16 else "missing-1.6.1170" if ok17 else "missing-ae")
+            ae_id = newer
+        elif kind == "ID":
             # Epoch unknown: a bare REL::ID is the same number on every runtime.
             status = "bare-id"
         elif not ae_id:
