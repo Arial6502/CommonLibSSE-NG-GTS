@@ -28,8 +28,10 @@ namespace RE
 		// override (MenuEventHandler)
 #ifndef SKYRIM_CROSS_VR
 		bool CanProcess(InputEvent* a_event) override;              // 01
+#ifndef ENABLE_SKYRIM_AE  // 1.7.99 moves these slots, see MenuEventHandler / PlayerInputHandler
 		bool ProcessThumbstick(ThumbstickEvent* a_event) override;  // 03
 		bool ProcessMouseMove(MouseMoveEvent* a_event) override;    // 04
+#endif
 #endif
 
 		[[nodiscard]] MenuEventHandler* AsMenuEventHandler() noexcept

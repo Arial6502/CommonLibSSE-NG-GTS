@@ -13,8 +13,10 @@ namespace RE
 
 		// override (MenuEventHandler)
 		bool CanProcess(InputEvent* a_event) override;      // 01
+#ifndef ENABLE_SKYRIM_AE  // 1.7.99 moves these slots, see MenuEventHandler / PlayerInputHandler
 		bool ProcessKinect(KinectEvent* a_event) override;  // 02
 		bool ProcessButton(ButtonEvent* a_event) override;  // 05
+#endif
 
 		// members
 		bool          unk10;  // 10

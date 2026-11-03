@@ -13,7 +13,9 @@ namespace RE
 
 		// override (PlayerInputHandler)
 		bool CanProcess(InputEvent* a_event) override;                                  // 01
+#ifndef ENABLE_SKYRIM_AE  // 1.7.99 moves these slots, see MenuEventHandler / PlayerInputHandler
 		void ProcessButton(ButtonEvent* a_event, PlayerControlsData* a_data) override;  // 04
+#endif
 
 		// members
 		std::uint64_t unk10;  // 10
