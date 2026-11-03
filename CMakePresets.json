@@ -145,7 +145,7 @@
         "runtimes-flatrim"
       ],
       "binaryDir": "${sourceDir}/build/relwithdebinfo"
-    },
+    }
   ],
   "buildPresets": [
     {
@@ -162,6 +162,6 @@
       "name": "relwithdebinfo",
       "displayName": "Flatrim - RelWithDebInfo",
       "configurePreset": "configure-relwithdebinfo"
-    },
+    }
   ]
 }
