@@ -257,7 +257,7 @@ namespace RE::Offset
 	{
 		constexpr auto GetNextUniqueID = RELOCATION_ID(15908, 16148);
 		constexpr auto SendContainerChangedEvent = RELOCATION_ID(15909, 16149);
-		constexpr auto SetUniqueID = RELOCATION_ID(15907, 16149);
+		constexpr auto SetUniqueID = RELOCATION_ID(15907, 16147);
 		constexpr auto TransferItemUID = RELOCATION_ID(15909, 16149);
 	}
 
