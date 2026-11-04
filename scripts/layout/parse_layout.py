@@ -15,7 +15,8 @@ import sys
 _CLASS = re.compile(r"^class (RE::\S.*?)\tsize\((\d+)\):$")
 _LINE = re.compile(r"^\s*(\d+)?\t((?:\| )*)(.*)$")
 _BASE = re.compile(r"^\+--- \((?:virtual )?base class (.*)\)$")
-_VFTABLE = re.compile(r"^(RE::\S.*?)::\$vftable@(.*)@:$")
+# A class with one vfptr prints '$vftable@:', one with several '$vftable@Base@:' per subobject.
+_VFTABLE = re.compile(r"^(RE::\S.*?)::\$vftable@(?:(.*)@)?:$")
 _SLOT = re.compile(r"^\s*(\d+)\t\| &")
 _ADJUST = re.compile(r"^\t\| (-?\d+)$")
 

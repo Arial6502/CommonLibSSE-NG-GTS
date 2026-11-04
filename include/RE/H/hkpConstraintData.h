@@ -74,6 +74,9 @@ namespace RE
 		virtual hkpSolverResults GetSolverResults(hkpConstraintRuntime* a_runtime);                                                                    // 0D
 		virtual void             AddInstance(hkpConstraintInstance* a_constraint, hkpConstraintRuntime* a_runtime, int32_t a_sizeOfRuntime) const;     // 0E
 		virtual void             RemoveInstance(hkpConstraintInstance* a_constraint, hkpConstraintRuntime* a_runtime, int32_t a_sizeOfRuntime) const;  // 0F
+		virtual void             Unk_10(void);                                                                                                         // 10 - writes false through a hidden return pointer
+		virtual void             Unk_11(void);                                                                                                         // 11 - { return; }
+		virtual void             Unk_12(void);                                                                                                         // 12 - pure, fills a constraint info
 
 		// members
 		uint64_t userData;  // 10

@@ -15,6 +15,12 @@ namespace RE
 
 		~hkpConstraintInstance() override;  // 00
 
+		// add
+		virtual void Unk_03(void);  // 03
+		virtual void Unk_04(void);  // 04
+		virtual void Unk_05(void);  // 05
+		virtual void Unk_06(void);  // 06
+
 		inline hkpRigidBody* GetRigidBodyA() const
 		{
 			return reinterpret_cast<hkpRigidBody*>(entities[0]);
