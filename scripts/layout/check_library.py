@@ -67,20 +67,32 @@ def main():
         if cls is None:
             continue
         checked += 1
+
+        def binary_vtables(rec):
+            out = {}
+            for t in rec["tables"]:
+                if t and not t.get("missing") and t.get("rtti") and t.get("kind") != "funcs":
+                    out.setdefault(t["rtti"]["col_offset"], len(t["slots"]))
+            return out
+
+        longest = {}
+        for f in facts:
+            rec = f.get(name)
+            if rec and "error" not in rec:
+                for off, n in binary_vtables(rec).items():
+                    longest[off] = max(longest.get(off, 0), n)
+
         for runtime, f in zip(RUNTIMES, facts):
             rec = f.get(name)
             if not rec or "error" in rec:
                 continue
-            binary_vt = {}
-            for t in rec["tables"]:
-                if t and not t.get("missing") and t.get("rtti") and t.get("kind") != "funcs":
-                    binary_vt.setdefault(t["rtti"]["col_offset"], len(t["slots"]))
+            binary_vt = binary_vtables(rec)
             for off, count in cls["vtables"].items():
                 have = binary_vt.get(int(off))
                 if have is not None and have != count:
-                    # With AE enabled, MenuEventHandler and PlayerInputHandler keep only the dtor
-                    # and CanProcess virtual (the rest dispatch through the runtime slot).
-                    check = "vtable-dispatch" if count == 2 and have > 2 else "vtable"
+                    # A vtable padded to the longest runtime's length is safe: the game never calls
+                    # past its end on any runtime. Shorter, or longer than every runtime, is a bug.
+                    check = "vtable-padded" if count > have and count == longest.get(int(off)) else "vtable"
                     out.write("%s\t%s\t%s\tsubobject 0x%X: library %d slots, binary %d\n" % (name, check, runtime, int(off), count, have))
                     problems += 1
             primary = rec["tables"][0] if rec["tables"] and rec["tables"][0] and rec["tables"][0].get("kind") != "funcs" else None
