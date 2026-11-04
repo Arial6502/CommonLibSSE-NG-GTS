@@ -84,7 +84,10 @@ All are committed scripts, so every result can be rerun (see "How to rerun").
 - [x] P5. 1.7.104 mismatches beyond GG's list: FirstPersonState (F22), LockpickingMenu (F23, GG wrong), BSInputDeviceManager (F26).
 - [x] P6. Flatrim builds. GTSPlugin breaks D1 causes, found by search (not built, D7): `skyrimVM->impl` in `Managers/Audio/MoansLaughs.cpp:24` and `Utils/PapyrusUtils.hpp:31,49,65,97`. Use `skyrimVM->GetRuntimeData().impl`. No other hidden member, moved base or removed override is used.
 - [x] P7. Final rerun of every lever (below).
-- [ ] P8. In-game test on 1.5.97, 1.6.1170 and 1.7.104. The user's call.
+- [ ] P8. In-game test on 1.5.97, 1.6.1170 and 1.7.104.
+  - [x] 1.6.1170: GTSPlugin built against this branch gets in game (user, 2026-11-04).
+  - [ ] 1.5.97
+  - [ ] 1.7.104 (needs GTSPlugin's hook offsets updated first)
 
 ## Last full run
 
