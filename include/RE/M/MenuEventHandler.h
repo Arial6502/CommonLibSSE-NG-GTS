@@ -53,6 +53,19 @@ namespace RE
 		{
 			return REL::Module::IsAtLeast(SKSE::RUNTIME_SSE_1_7_99) ? a_index + 2 : a_index;
 		}
+
+	private:
+		// No compile time vtable fits every runtime, but the game must never call past the end of
+		// a plugin subclass's vtable. These pad it to the longest runtime (1.7.99) and do nothing,
+		// which is also what the game's own defaults do.
+		virtual bool Unk_02(void*) { return false; }  // 02
+		virtual bool Unk_03(void*) { return false; }  // 03
+		virtual bool Unk_04(void*) { return false; }  // 04
+		virtual bool Unk_05(void*) { return false; }  // 05
+		virtual bool Unk_06(void*) { return false; }  // 06
+		virtual bool Unk_07(void*) { return false; }  // 07
+
+	public:
 #endif
 
 		// members

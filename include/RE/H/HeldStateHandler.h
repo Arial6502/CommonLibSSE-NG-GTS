@@ -19,6 +19,13 @@ namespace RE
 		// 05 and 06, 07 and 08 from 1.7.99 (see PlayerInputHandler).
 		void UpdateHeldStateActive(const ButtonEvent* a_event) { REL::RelocateVirtual<void(HeldStateHandler*, const ButtonEvent*)>(Slot(0x05), 0x05, this, a_event); }
 		void SetHeldStateActive(bool a_flag) { REL::RelocateVirtual<void(HeldStateHandler*, bool)>(Slot(0x06), 0x06, this, a_flag); }
+
+	private:
+		// Pads the vtable to 1.7.99's length, see PlayerInputHandler.
+		virtual void Unk_07(void*) {}  // 07
+		virtual void Unk_08(void*) {}  // 08
+
+	public:
 #endif
 
 		// members
