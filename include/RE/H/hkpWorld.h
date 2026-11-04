@@ -102,7 +102,7 @@ namespace RE
 		inline void UpdateCollisionFilterOnPhantom(hkpPhantom* phantom, hkpUpdateCollectionFilterMode updateShapeCollectionFilter)
 		{
 			typedef void (*DefUpdateCollisionFilterOnPhantom)(hkpWorld*, hkpPhantom*, hkpUpdateCollectionFilterMode);
-			REL::Relocation<DefUpdateCollisionFilterOnPhantom> RealUpdateCollisionFilterOnPhantom{ RELOCATION_ID(60509, 61321) };
+			REL::Relocation<DefUpdateCollisionFilterOnPhantom> RealUpdateCollisionFilterOnPhantom{ RELOCATION_ID(60511, 61323) };
 			RealUpdateCollisionFilterOnPhantom(this, phantom, updateShapeCollectionFilter);
 		}
 
