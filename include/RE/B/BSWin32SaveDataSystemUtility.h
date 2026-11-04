@@ -14,6 +14,8 @@ namespace RE
 		// override (BSSaveDataSystemUtility)
 		bool    CreateSaveDirectory(const char* a_pathName, bool a_ignoreINI) override;                               // 01
 		errno_t PrepareFileSavePath(const char* a_fileName, char* a_dst, bool a_tmpSave, bool a_ignoreINI) override;  // 02
+#ifndef ENABLE_SKYRIM_AE
+		// The slots after 04 move on 1.7.99, see BSSaveDataSystemUtility.
 		void    Unk_05(void) override;                                                                                // 05
 		void    Unk_06(void) override;                                                                                // 06
 		void    Unk_07(void) override;                                                                                // 07
@@ -21,6 +23,7 @@ namespace RE
 		void    Unk_09(void) override;                                                                                // 09 - { return; }
 		void    Unk_0C(void) override;                                                                                // 0C
 		void    Unk_11(void) override;                                                                                // 11 - { return; }
+#endif
 
 		static BSWin32SaveDataSystemUtility* GetSingleton();
 	};

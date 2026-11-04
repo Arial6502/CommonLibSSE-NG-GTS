@@ -132,7 +132,8 @@ namespace RE::Offset
 
 	namespace BSString
 	{
-		constexpr auto Set_CStr = RELOCATION_ID(10979, 11044);
+		// 11044 before 1.6.1130, which is not supported.
+		constexpr auto Set_CStr = RELOCATION_ID(10979, 439876);
 	}
 
 	namespace BucketTable

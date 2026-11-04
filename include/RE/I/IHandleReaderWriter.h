@@ -19,8 +19,6 @@ namespace RE
 			virtual void Unk_08() = 0;
 			virtual bool SaveHandle(SaveStorageWrapper* saveWrapper, VMHandle handle) = 0;
 			virtual bool LoadHandle(BSMemStorage* loadWrapper, VMHandle* out) = 0;
-			virtual bool SaveRefID(SaveStorageWrapper* saveWrapper, uint32_t handleLow);
-			virtual bool ParseScriptInstance(BSMemStorage* loadWrapper, uint32_t* scriptInstanceValues);
 		};
 		static_assert(sizeof(IHandleReaderWriter) == 0x8);
 	}

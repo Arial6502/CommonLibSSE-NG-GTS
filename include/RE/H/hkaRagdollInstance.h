@@ -14,6 +14,9 @@ namespace RE
 
 		~hkaRagdollInstance() override;  // 00
 
+		// add
+		virtual void Unk_03(void);  // 03
+
 		// members
 		hkArray<hkpRigidBody*>          rigidBodies;         // 10
 		hkArray<hkpConstraintInstance*> constraints;         // 20
