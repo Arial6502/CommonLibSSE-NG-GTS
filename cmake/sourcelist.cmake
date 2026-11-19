@@ -799,13 +799,16 @@ set(SOURCES
 	include/RE/H/hkaAnimationBinding.h
 	include/RE/H/hkaAnimationControl.h
 	include/RE/H/hkaAnnotationTrack.h
+	include/RE/H/hkaBone.h
 	include/RE/H/hkaDefaultAnimationControl.h
 	include/RE/H/hkaRagdollInstance.h
+	include/RE/H/hkaSkeleton.h
 	include/RE/H/hkbBehaviorGraph.h
 	include/RE/H/hkbBehaviorGraphData.h
 	include/RE/H/hkbBehaviorGraphStringData.h
 	include/RE/H/hkbBindable.h
 	include/RE/H/hkbCharacter.h
+	include/RE/H/hkbCharacterSetup.h
 	include/RE/H/hkbClipGenerator.h
 	include/RE/H/hkbContext.h
 	include/RE/H/hkbEvent.h
