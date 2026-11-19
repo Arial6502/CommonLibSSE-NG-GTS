@@ -308,6 +308,7 @@
 #include "RE/B/BSLightingShaderProperty.h"
 #include "RE/B/BSMaterialObject.h"
 #include "RE/B/BSMemStorage.h"
+#include "RE/B/BSModelDB.h"
 #include "RE/B/BSMouseDevice.h"
 #include "RE/B/BSMultiBound.h"
 #include "RE/B/BSMultiBoundAABB.h"

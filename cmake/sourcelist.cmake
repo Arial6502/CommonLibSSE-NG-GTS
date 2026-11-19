@@ -256,6 +256,7 @@ set(SOURCES
 	include/RE/B/BSLightingShaderProperty.h
 	include/RE/B/BSMaterialObject.h
 	include/RE/B/BSMemStorage.h
+	include/RE/B/BSModelDB.h
 	include/RE/B/BSMouseDevice.h
 	include/RE/B/BSMultiBound.h
 	include/RE/B/BSMultiBoundAABB.h
@@ -1526,6 +1527,7 @@ set(SOURCES
 	src/RE/B/BSInstanceTriShape.cpp
 	src/RE/B/BSLightingShaderMaterialBase.cpp
 	src/RE/B/BSLightingShaderProperty.cpp
+	src/RE/B/BSModelDB.cpp
 	src/RE/B/BSMultiBoundNode.cpp
 	src/RE/B/BSPointerHandle.cpp
 	src/RE/B/BSResourceNiBinaryStream.cpp
